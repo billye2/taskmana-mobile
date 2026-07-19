@@ -1,0 +1,696 @@
+/* Clean flat 2.0 — Linear/shadcn-inspired. System fonts, neutral zinc palette,
+   1px borders, small radii, subtle elevation. Dark mode via prefers-color-scheme. */
+
+:root {
+  --background: #fafafa;
+  --surface: #ffffff;
+  --foreground: #18181b;
+  --muted-fg: #71717a;
+  --faint: #a1a1aa;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --primary: #18181b;
+  --primary-fg: #fafafa;
+  --accent-bg: #f4f4f5;
+  --ring: #a1a1aa;
+  --amber: #b45309;
+  --amber-bg: #fffbeb;
+  --amber-border: #fde68a;
+  --danger: #dc2626;
+  --success: #15803d;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Dark tokens apply when the user forces dark, or in Auto mode when the
+   system is dark. Forced light (data-theme="light") always wins. */
+:root[data-theme="dark"] {
+  --background: #09090b;
+  --surface: #131316;
+  --foreground: #f4f4f5;
+  --muted-fg: #a1a1aa;
+  --faint: #63636b;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --primary: #fafafa;
+  --primary-fg: #18181b;
+  --accent-bg: #1c1c1f;
+  --ring: #52525b;
+  --amber: #fbbf24;
+  --amber-bg: #26200f;
+  --amber-border: #453a16;
+  --danger: #f87171;
+  --success: #4ade80;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #09090b;
+    --surface: #131316;
+    --foreground: #f4f4f5;
+    --muted-fg: #a1a1aa;
+    --faint: #63636b;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --primary: #fafafa;
+    --primary-fg: #18181b;
+    --accent-bg: #1c1c1f;
+    --ring: #52525b;
+    --amber: #fbbf24;
+    --amber-bg: #26200f;
+    --amber-border: #453a16;
+    --danger: #f87171;
+    --success: #4ade80;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 8vh 24px 80px;
+}
+
+/* ---- header ---- */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+#date-line {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+
+.masthead-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted-fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.chip:hover {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+  background: var(--accent-bg);
+}
+
+.chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-fg);
+}
+
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 2px solid var(--background);
+}
+
+/* ---- capture ---- */
+
+.capture {
+  margin-bottom: 32px;
+}
+
+#capture-input {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+#capture-input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+
+#capture-input::placeholder {
+  color: var(--faint);
+}
+
+/* ---- sections ---- */
+
+.section {
+  margin-bottom: 28px;
+}
+
+.section-head,
+.someday summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+h2 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-fg);
+  display: inline;
+}
+
+.section-meta {
+  font-size: 11.5px;
+  color: var(--muted-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.tomorrow-note {
+  font-size: 12px;
+  color: var(--muted-fg);
+  margin-bottom: 6px;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted-fg);
+  margin: -2px 0 10px;
+  max-width: 56ch;
+}
+
+.hint strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+body.hints-off .hint {
+  display: none;
+}
+
+.hint-example {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.example-text {
+  font-style: italic;
+}
+
+.example-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted-fg);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.example-btn:hover {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+}
+
+.dialog .hint-example {
+  margin: -8px 0 16px;
+}
+
+.empty-hint {
+  color: var(--muted-fg);
+  font-size: 13px;
+  padding: 6px 2px;
+}
+
+.someday summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.someday summary::-webkit-details-marker {
+  display: none;
+}
+
+.someday summary::before {
+  content: "▸";
+  color: var(--faint);
+  font-size: 9px;
+  margin-right: 2px;
+}
+
+.someday[open] summary::before {
+  content: "▾";
+}
+
+/* ---- task rows ---- */
+
+.task-list {
+  list-style: none;
+}
+
+#today-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+#today-list:empty {
+  display: none;
+}
+
+#today-list .task {
+  padding: 11px 14px;
+  border-radius: 0;
+}
+
+#today-list .task + .task,
+#today-list .bonus-divider + .task {
+  border-top: 1px solid var(--border);
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  transition: background 0.1s;
+}
+
+.plain .task:hover {
+  background: var(--accent-bg);
+}
+
+#today-list .task.top .text {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+#today-list .bonus-divider {
+  list-style: none;
+  padding: 5px 14px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-fg);
+  background: var(--accent-bg);
+  border-top: 1px solid var(--border);
+}
+
+.task .check {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin-top: 3px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  background: var(--surface);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.task .check:hover {
+  border-color: var(--ring);
+}
+
+.task .check:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.task .check:checked::before {
+  content: "✓";
+  color: var(--primary-fg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.task .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task .text {
+  overflow-wrap: break-word;
+  cursor: default;
+}
+
+.task.done-row .text {
+  text-decoration: line-through;
+  color: var(--muted-fg);
+  font-weight: 400;
+}
+
+.task.locked {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.migrations {
+  color: var(--amber);
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.task .actions {
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.task:hover .actions,
+.task:focus-within .actions {
+  opacity: 1;
+}
+
+.icon-btn {
+  border: none;
+  background: none;
+  color: var(--muted-fg);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 3px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+
+.icon-btn:hover {
+  background: var(--accent-bg);
+  color: var(--foreground);
+}
+
+#today-list .icon-btn:hover {
+  background: var(--background);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-btn.danger:hover {
+  color: var(--danger);
+}
+
+.edit-input {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 6px;
+  padding: 2px 8px;
+  outline: none;
+}
+
+/* migration decision prompt */
+
+.migration-prompt {
+  margin-top: 8px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.migration-prompt .q {
+  color: var(--amber);
+  font-weight: 500;
+}
+
+.migration-prompt .icon-btn:hover {
+  background: color-mix(in srgb, var(--amber) 15%, transparent);
+}
+
+/* ---- footer / done log ---- */
+
+.footer {
+  margin-top: 36px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  color: var(--muted-fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 5px;
+  transition: color 0.1s, background 0.1s;
+}
+
+.link-btn:hover {
+  color: var(--foreground);
+  background: var(--accent-bg);
+}
+
+#done-toggle {
+  color: var(--success);
+}
+
+.done-log {
+  margin-top: 8px;
+}
+
+.done-log .task {
+  padding: 3px 10px;
+  color: var(--muted-fg);
+  font-size: 13px;
+}
+
+.done-log .text {
+  text-decoration: line-through;
+}
+
+/* ---- dialogs ---- */
+
+.dialog {
+  /* the * { margin: 0 } reset removes the UA's margin: auto that centers
+     native dialogs — restore it */
+  margin: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 24px;
+  width: min(520px, 92vw);
+  box-shadow: var(--shadow-md);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.dialog h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--foreground);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.dialog-sub {
+  font-size: 13px;
+  color: var(--muted-fg);
+  margin-bottom: 16px;
+}
+
+.review-card {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  min-height: 80px;
+}
+
+.review-text {
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.review-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-fg);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.btn:hover {
+  border-color: var(--border-strong);
+  background: var(--accent-bg);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: none;
+}
+
+#plan-save {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-fg);
+}
+
+#plan-save:hover {
+  opacity: 0.9;
+}
+
+.dialog-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* plan tomorrow */
+
+.plan-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.plan-row {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding: 8px 10px;
+}
+
+.plan-row:hover {
+  background: var(--accent-bg);
+}
+
+.plan-row.selected {
+  border-color: var(--border-strong);
+  background: var(--accent-bg);
+}
+
+.plan-num {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  color: var(--muted-fg);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: grid;
+  place-content: center;
+  margin-top: 1px;
+}
+
+.task.selected .plan-num {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-fg);
+}

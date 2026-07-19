@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Tab</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <h1 id="date-line"></h1>
+      <div class="masthead-actions">
+        <button id="hints-toggle" class="chip" title="Show or hide method hints" aria-label="Show or hide method hints">?</button>
+        <button id="theme-toggle" class="chip" title="Theme: Auto follows your system appearance">Auto</button>
+        <button id="focus-toggle" class="chip" title="Ivy Lee focus: work tasks strictly in order">Focus</button>
+        <button id="review-btn" class="chip" title="Weekly review: sort your inbox and stale tasks">Review<span id="review-badge" class="badge" hidden></span></button>
+        <button id="plan-btn" class="chip" title="End your day: choose tomorrow's tasks in order">Plan tomorrow</button>
+      </div>
+    </header>
+
+    <form id="capture-form" class="capture" autocomplete="off">
+      <input id="capture-input" type="text" placeholder="What's on your mind? Get it out of your head…" aria-label="Capture a task" />
+    </form>
+
+    <section class="section" id="today-section">
+      <div class="section-head">
+        <h2>Today</h2>
+        <span id="today-count" class="section-meta"></span>
+      </div>
+      <p class="hint"><strong>Ivy Lee Method</strong> (Ivy Lee, 1918) — up to 6 tasks in priority order; the top 3 are what would make today a win. <strong>Focus</strong> locks you to one task at a time, strictly in order. A <span class="migrations">›</span> means a task was carried over a day (<strong>Bullet Journal</strong> migration, Ryder Carroll) — after 5 carries it will ask if it&rsquo;s still worth doing.</p>
+      <p class="hint hint-example" data-section="today"><button type="button" class="example-btn" aria-label="Show another example for Today" title="Show another example">↻</button><span class="example-text"></span></p>
+      <p id="tomorrow-note" class="tomorrow-note" hidden></p>
+      <ul id="today-list" class="task-list"></ul>
+      <p id="today-empty" class="empty-hint" hidden>Pick up to 6 tasks from your inbox. The first 3 are what would make today a win.</p>
+    </section>
+
+    <section class="section" id="inbox-section">
+      <div class="section-head">
+        <h2>Inbox</h2>
+        <span id="inbox-count" class="section-meta"></span>
+      </div>
+      <p class="hint"><strong>Brain dump</strong> (David Allen, <em>Getting Things Done</em>) — capture everything here the moment it crosses your mind; your head is for having ideas, not holding them. Promote to Today deliberately, and sort the rest in the weekly <strong>Review</strong>.</p>
+      <p class="hint hint-example" data-section="inbox"><button type="button" class="example-btn" aria-label="Show another example for the Inbox" title="Show another example">↻</button><span class="example-text"></span></p>
+      <ul id="inbox-list" class="task-list plain"></ul>
+      <p id="inbox-empty" class="empty-hint" hidden>Empty. Nice — your head is clear.</p>
+    </section>
+
+    <details class="section someday" id="someday-section">
+      <summary><h2>Someday</h2><span id="someday-count" class="section-meta"></span></summary>
+      <p class="hint"><strong>Someday/Maybe</strong> (David Allen, <em>GTD</em>) — parked without guilt, not deleted. Resurfaces in the weekly Review so it stays a decision, not a graveyard.</p>
+      <p class="hint hint-example" data-section="someday"><button type="button" class="example-btn" aria-label="Show another example for Someday" title="Show another example">↻</button><span class="example-text"></span></p>
+      <ul id="someday-list" class="task-list plain"></ul>
+    </details>
+
+    <footer class="footer">
+      <button id="done-toggle" class="link-btn" hidden></button>
+      <ul id="done-list" class="task-list plain done-log" hidden></ul>
+    </footer>
+  </main>
+
+  <dialog id="review-dialog" class="dialog" aria-labelledby="review-title">
+    <h2 id="review-title">Weekly review</h2>
+    <p class="dialog-sub">David Allen&rsquo;s GTD weekly review: one item at a time. Be honest — dropping something is a decision, not a failure.</p>
+    <p class="hint hint-example" data-section="review"><button type="button" class="example-btn" aria-label="Show another example for the weekly review" title="Show another example">↻</button><span class="example-text"></span></p>
+    <div id="review-card" class="review-card">
+      <p id="review-text" class="review-text"></p>
+      <p id="review-meta" class="review-meta"></p>
+    </div>
+    <div class="dialog-actions" id="review-actions">
+      <button data-act="today" class="btn">Today</button>
+      <button data-act="keep" class="btn">This week</button>
+      <button data-act="someday" class="btn">Someday</button>
+      <button data-act="drop" class="btn danger">Drop</button>
+    </div>
+    <div class="dialog-foot">
+      <span id="review-progress" class="section-meta"></span>
+      <button id="review-close" class="link-btn">Close</button>
+    </div>
+  </dialog>
+
+  <dialog id="plan-dialog" class="dialog" aria-labelledby="plan-title">
+    <h2 id="plan-title">Plan tomorrow</h2>
+    <p class="dialog-sub">Ivy Lee&rsquo;s evening ritual: pick up to 6 tasks in the order you&rsquo;ll work them tomorrow. Click to add, click again to remove.</p>
+    <p class="hint hint-example" data-section="plan"><button type="button" class="example-btn" aria-label="Show another example for planning tomorrow" title="Show another example">↻</button><span class="example-text"></span></p>
+    <ul id="plan-list" class="task-list plain plan-list"></ul>
+    <p id="plan-empty" class="empty-hint" hidden>Nothing to plan from — capture some tasks first.</p>
+    <div class="dialog-foot">
+      <span id="plan-count" class="section-meta"></span>
+      <span>
+        <button id="plan-cancel" class="link-btn">Cancel</button>
+        <button id="plan-save" class="btn">Save plan</button>
+      </span>
+    </div>
+  </dialog>
+
+  <script src="js/store.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
