@@ -563,6 +563,53 @@ body.hints-off .hint {
   text-decoration: line-through;
 }
 
+.history {
+  margin-top: 10px;
+}
+
+.history summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: inline-block;
+  color: var(--muted-fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 5px;
+  transition: color 0.1s, background 0.1s;
+}
+
+.history summary:hover {
+  color: var(--foreground);
+  background: var(--accent-bg);
+}
+
+.history summary::-webkit-details-marker {
+  display: none;
+}
+
+.history summary::before {
+  content: "▸";
+  color: var(--faint);
+  font-size: 9px;
+  margin-right: 4px;
+}
+
+.history[open] summary::before {
+  content: "▾";
+}
+
+.history-date {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-fg); /* --faint fails AA contrast at this size */
+  margin: 12px 0 2px;
+  padding-left: 6px;
+}
+
 /* ---- dialogs ---- */
 
 .dialog {
@@ -720,4 +767,147 @@ body.hints-off .hint {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--primary-fg);
+}
+
+.plan-preview {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+
+.preview-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-fg);
+  margin-bottom: 6px;
+}
+
+.preview-list {
+  /* inside markers need inline-flow rows — don't flex these */
+  list-style: decimal inside;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-row {
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+.preview-row .migrations {
+  margin-left: 6px;
+}
+
+.preview-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted-fg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 5px;
+}
+
+.preview-overflow {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-fg);
+}
+
+/* ---- sync ---------------------------------------------------------------- */
+
+.sync-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: 1px;
+  background: var(--success);
+}
+
+.sync-dot[data-state="offline"] {
+  background: var(--amber);
+}
+
+.sync-dot[data-state="syncing"] {
+  background: var(--faint);
+}
+
+.sync-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sync-label {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--muted-fg);
+}
+
+.sync-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.sync-form input:focus {
+  border-color: var(--ring);
+}
+
+.sync-account {
+  font-size: 13px;
+  color: var(--muted-fg);
+  margin-bottom: 8px;
+}
+
+#sync-signedin {
+  margin-bottom: 14px;
+}
+
+.sync-error {
+  font-size: 12.5px;
+  color: var(--danger);
+  margin-bottom: 12px;
+}
+
+/* ---- touch (iPhone PWA) ------------------------------------------------- */
+/* (hover: none) never matches a mouse-driven desktop, so none of this
+   affects the extension or the visual-regression baselines. */
+
+@media (hover: none) {
+  .task .actions {
+    opacity: 1; /* no hover to reveal them with */
+  }
+
+  .icon-btn {
+    padding: 9px 10px;
+  }
+
+  .task .check {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+  }
+
+  /* 16px+ stops iOS Safari from zooming the page when an input focuses */
+  #capture-input,
+  .edit-input {
+    font-size: 16px;
+  }
+
+  .page {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(80px, env(safe-area-inset-bottom));
+  }
 }

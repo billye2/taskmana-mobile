@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { test, expect, capture } from './fixtures';
+import { test, expect, capture, writeStateAndReload, localDate } from './fixtures';
 
 async function expectNoViolations(page: import('@playwright/test').Page) {
   const results = await new AxeBuilder({ page })
@@ -36,6 +36,31 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
   test('review dialog', async ({ page }) => {
     await capture(page, 'reviewable');
     await page.getByRole('button', { name: 'Review', exact: true }).click();
+    await expectNoViolations(page);
+  });
+
+  test('sync dialog', async ({ page }) => {
+    await page.locator('#sync-btn').click();
+    await expect(page.locator('#sync-dialog')).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('expanded previous-days history', async ({ page }) => {
+    await writeStateAndReload(page, (s) => {
+      s.tasks.push({
+        id: 'hist-a11y',
+        text: 'done yesterday',
+        createdAt: 1750000000000,
+        status: 'done',
+        order: null,
+        migrationCount: 0,
+        ackMigrations: 0,
+        completedAt: 1750000001000,
+        completedOn: localDate(1),
+      });
+    });
+    await page.locator('#history-section summary').click();
+    await expect(page.locator('#history-body .task .text')).toBeVisible();
     await expectNoViolations(page);
   });
 

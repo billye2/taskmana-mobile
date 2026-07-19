@@ -11,5 +11,6 @@
     "types": ["chrome", "node"],
     "skipLibCheck": true
   },
-  "include": ["js/**/*.js", "tests/**/*.ts", "playwright.config.ts"]
+  "include": ["js/**/*.js", "tests/**/*.ts", "playwright.config.ts"],
+  "exclude": ["js/vendor"]
 }

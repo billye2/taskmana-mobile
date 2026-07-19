@@ -67,6 +67,67 @@ test('toggleDone marks done with date and back to today', () => {
   assert.equal(t.completedOn, null);
 });
 
+test('doneHistory is empty on a fresh state and excludes today’s dones', () => {
+  const s = freshState();
+  assert.deepEqual(M.doneHistory(s, DAY), []);
+  const t = add(s, 'x');
+  M.promoteToToday(s, t.id);
+  M.toggleDone(s, t.id, DAY);
+  assert.deepEqual(M.doneHistory(s, DAY), []); // today's dones live in doneToday
+});
+
+test('doneHistory groups by day, newest day first, newest completion first within a day', () => {
+  const s = freshState();
+  const [a, b, c] = ['a', 'b', 'c'].map((x) => add(s, x));
+  M.toggleDone(s, a.id, '2026-07-16');
+  M.toggleDone(s, b.id, '2026-07-17');
+  M.toggleDone(s, c.id, '2026-07-17');
+  b.completedAt = 1000;
+  c.completedAt = 2000;
+  assert.deepEqual(
+    M.doneHistory(s, DAY).map((g) => [g.date, g.tasks.map((t) => t.text)]),
+    [['2026-07-17', ['c', 'b']], ['2026-07-16', ['a']]]
+  );
+});
+
+test('doneHistory omits un-toggled tasks and includes pre-rollover dones', () => {
+  const s = freshState();
+  const undone = add(s, 'undone');
+  M.toggleDone(s, undone.id, '2026-07-16');
+  M.toggleDone(s, undone.id, '2026-07-16'); // unchecked again
+  const kept = add(s, 'kept');
+  M.promoteToToday(s, kept.id);
+  M.toggleDone(s, kept.id, DAY); // tab open past midnight: no rollover, order still set
+  assert.deepEqual(
+    M.doneHistory(s, NEXT_DAY).map((g) => g.tasks.map((t) => t.text)),
+    [['kept']]
+  );
+});
+
+test('doneHistory caps the days shown at the limit', () => {
+  const s = freshState();
+  for (const day of ['2026-07-14', '2026-07-15', '2026-07-16']) {
+    M.toggleDone(s, add(s, `done ${day}`).id, day);
+  }
+  assert.deepEqual(
+    M.doneHistory(s, DAY, 2).map((g) => g.date),
+    ['2026-07-16', '2026-07-15']
+  );
+});
+
+test('rollover moves yesterday’s dones from doneToday into doneHistory', () => {
+  const s = freshState();
+  const t = add(s, 'finished');
+  M.promoteToToday(s, t.id);
+  M.toggleDone(s, t.id, DAY);
+  M.rollover(s, NEXT_DAY);
+  assert.deepEqual(M.doneToday(s, NEXT_DAY), []);
+  assert.deepEqual(
+    M.doneHistory(s, NEXT_DAY).map((g) => [g.date, g.tasks.map((x) => x.text)]),
+    [[DAY, ['finished']]]
+  );
+});
+
 test('currentFocusTask is the first unfinished today task', () => {
   const s = freshState();
   const [a, b] = ['a', 'b'].map((x) => add(s, x));
@@ -122,6 +183,49 @@ test('rollover archives done tasks off the today list', () => {
   assert.equal(t.order, null);
   assert.equal(M.todayList(s).length, 0);
   assert.deepEqual(M.doneToday(s, NEXT_DAY), []); // done log is per-day
+});
+
+test('tomorrowPreview orders picks first, dedupes, splits at the cap, skips invalid ids', () => {
+  const s = freshState();
+  const carried = add(s, 'carried');
+  M.promoteToToday(s, carried.id);
+  const picks = [];
+  for (let i = 0; i < 6; i++) picks.push(add(s, `pick ${i}`));
+  const done = add(s, 'already done');
+  M.toggleDone(s, done.id, DAY);
+
+  const ids = [...picks.map((t) => t.id), done.id, carried.id, 'no-such-id'];
+  const { today, overflow } = M.tomorrowPreview(s, ids);
+  assert.deepEqual(today.map((t) => t.text), ['pick 0', 'pick 1', 'pick 2', 'pick 3', 'pick 4', 'pick 5']);
+  assert.deepEqual(overflow.map((t) => t.text), ['carried']); // deduped: queued once, not twice
+});
+
+test('tomorrowPreview matches what rollover actually produces', () => {
+  const s = freshState();
+  for (let i = 0; i < 4; i++) M.promoteToToday(s, add(s, `carried ${i}`).id);
+  const inboxPick = add(s, 'inbox pick');
+  const somedayPick = add(s, 'someday pick');
+  M.sendToSomeday(s, somedayPick.id);
+  // queue an inbox task, a someday task, and a task that is also carried
+  const dup = M.todayList(s)[0];
+  M.setTomorrowQueue(s, [inboxPick.id, somedayPick.id, dup.id]);
+
+  const preview = M.tomorrowPreview(s, s.tomorrowQueue);
+  const clone = structuredClone(s);
+  M.rollover(clone, NEXT_DAY);
+  assert.deepEqual(preview.today.map((t) => t.id), M.todayList(clone).map((t) => t.id));
+  for (const t of preview.overflow) {
+    assert.equal(M.getTask(clone, t.id)?.status, 'inbox');
+  }
+});
+
+test('tomorrowPreview is pure — no migration bumps or status changes', () => {
+  const s = freshState();
+  M.promoteToToday(s, add(s, 'carried').id);
+  const pick = add(s, 'picked');
+  const before = JSON.stringify(s);
+  M.tomorrowPreview(s, [pick.id]);
+  assert.equal(JSON.stringify(s), before);
 });
 
 test('rollover overflow past the cap returns tasks to the inbox', () => {

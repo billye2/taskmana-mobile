@@ -26,6 +26,8 @@ const TaskmanaStore = (() => {
     } else {
       localStorage.setItem(KEY, JSON.stringify(state));
     }
+    // Optional sync layer (js/sync.js); absent in tests and when signed out.
+    /** @type {any} */ (globalThis).TaskmanaSync?.onLocalSave?.();
   }
 
   return { load, save };

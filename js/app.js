@@ -139,11 +139,13 @@ function migrationMarks(task) {
   return span;
 }
 
+// No hover implies no double-click either (touch device) — edit on tap there.
+const coarsePointer = matchMedia('(hover: none)').matches;
+
 /** @param {Task} task @returns {HTMLElement} */
 function editableText(task) {
   const span = el('span', 'text', task.text);
-  span.title = 'Double-click to edit';
-  span.addEventListener('dblclick', () => {
+  const startEdit = () => {
     const input = el('input', 'edit-input');
     input.value = task.text;
     input.setAttribute('aria-label', 'Edit task');
@@ -159,8 +161,24 @@ function editableText(task) {
       if (e.key === 'Escape') render();
     });
     input.addEventListener('blur', commit);
-  });
+  };
+  span.addEventListener(coarsePointer ? 'click' : 'dblclick', startEdit);
+  if (!coarsePointer) span.title = 'Double-click to edit';
   return span;
+}
+
+/** @param {string} dateStr @param {string} today */
+function historyDayLabel(dateStr, today) {
+  // new Date('YYYY-MM-DD') parses as UTC midnight and renders the previous
+  // day in negative-offset timezones — build from parts to stay local.
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const ago = M.daysBetween(dateStr, today);
+  return `${label} · ${ago === 1 ? 'yesterday' : `${ago} days ago`}`;
 }
 
 // ---- render -----------------------------------------------------------------
@@ -345,6 +363,23 @@ function renderFooter(today) {
     const row = el('li', 'task');
     row.appendChild(el('span', 'text', task.text));
     listEl.appendChild(row);
+  }
+
+  // Only the inner body is rebuilt — recreating the <details> itself would
+  // reset its open state on every persistAndRender.
+  const history = M.doneHistory(state, today);
+  $('history-section').hidden = history.length === 0;
+  const body = $('history-body');
+  body.replaceChildren();
+  for (const day of history) {
+    body.appendChild(el('h3', 'history-date', historyDayLabel(day.date, today)));
+    const ul = el('ul', 'task-list plain done-log');
+    for (const task of day.tasks) {
+      const row = el('li', 'task');
+      row.appendChild(el('span', 'text', task.text));
+      ul.appendChild(row);
+    }
+    body.appendChild(ul);
   }
 }
 
@@ -553,6 +588,39 @@ function renderPlanList() {
     li.appendChild(row);
     listEl.appendChild(li);
   }
+
+  renderPlanPreview();
+}
+
+// Live preview of the post-rollover Today list for the current picks — the
+// payoff of planning is otherwise invisible until tomorrow's first open.
+function renderPlanPreview() {
+  const { today, overflow } = M.tomorrowPreview(state, planSelection);
+  const wrap = $('plan-preview');
+  wrap.hidden = today.length === 0;
+  if (wrap.hidden) return;
+
+  const listEl = $('plan-preview-list');
+  listEl.replaceChildren();
+  for (const task of today) {
+    const li = el('li', 'preview-row');
+    li.appendChild(el('span', 'text', task.text));
+    if (task.status === 'today') {
+      // rollover will add one more › mark to any unfinished today task
+      const marks = migrationMarks({ ...task, migrationCount: task.migrationCount + 1 });
+      if (marks) li.appendChild(marks);
+    }
+    if (!planSelection.includes(task.id)) li.appendChild(el('span', 'preview-tag', 'carried'));
+    listEl.appendChild(li);
+  }
+
+  const over = $('plan-preview-overflow');
+  over.hidden = overflow.length === 0;
+  if (overflow.length) {
+    over.textContent = `Past the cap of ${M.TODAY_CAP} — back to inbox: ${overflow
+      .map((t) => t.text)
+      .join(', ')}`;
+  }
 }
 
 $('plan-save').addEventListener('click', async () => {
@@ -563,6 +631,80 @@ $('plan-save').addEventListener('click', async () => {
 
 $('plan-cancel').addEventListener('click', () => $dialog('plan-dialog').close());
 
+// ---- sync -------------------------------------------------------------------
+
+/** @type {Record<string, string>} */
+const SYNC_STATUS_LABELS = {
+  'signed-out': '',
+  syncing: 'Syncing…',
+  idle: 'Synced',
+  offline: 'Offline — will retry',
+};
+
+let syncStep = 'email'; // email | code — which sign-in form is showing
+
+function renderSync() {
+  const signedIn = !!TaskmanaSync.account();
+  const status = TaskmanaSync.status();
+  const dot = $('sync-dot');
+  dot.hidden = !signedIn;
+  dot.dataset.state = status;
+
+  const configured = TaskmanaSync.isConfigured();
+  $('sync-unconfigured').hidden = configured;
+  $('sync-email-form').hidden = !configured || signedIn || syncStep !== 'email';
+  $('sync-code-form').hidden = !configured || signedIn || syncStep !== 'code';
+  $('sync-signedin').hidden = !configured || !signedIn;
+  if (signedIn) $('sync-account').textContent = `Signed in as ${TaskmanaSync.account()}`;
+  $('sync-status').textContent = SYNC_STATUS_LABELS[status] ?? '';
+}
+
+/** @param {unknown} err */
+function showSyncError(err) {
+  const p = $('sync-error');
+  p.hidden = false;
+  p.textContent = err instanceof Error ? err.message : 'Something went wrong — try again.';
+}
+
+$('sync-btn').addEventListener('click', () => {
+  syncStep = 'email';
+  $('sync-error').hidden = true;
+  renderSync();
+  $dialog('sync-dialog').showModal();
+});
+
+$('sync-email-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('sync-error').hidden = true;
+  try {
+    await TaskmanaSync.sendCode($input('sync-email').value.trim());
+    syncStep = 'code';
+    renderSync();
+    $input('sync-code').focus();
+  } catch (err) {
+    showSyncError(err);
+  }
+});
+
+$('sync-code-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('sync-error').hidden = true;
+  try {
+    await TaskmanaSync.verifyCode($input('sync-email').value.trim(), $input('sync-code').value.trim());
+    renderSync();
+  } catch (err) {
+    showSyncError(err);
+  }
+});
+
+$('sync-signout').addEventListener('click', async () => {
+  await TaskmanaSync.signOut();
+  syncStep = 'email';
+  renderSync();
+});
+
+$('sync-close').addEventListener('click', () => $dialog('sync-dialog').close());
+
 // ---- boot -------------------------------------------------------------------
 
 async function init() {
@@ -572,6 +714,24 @@ async function init() {
   if (M.rollover(state, M.todayStr())) await store.save(state);
   render();
   $input('capture-input').focus();
+
+  TaskmanaSync.onStatus(renderSync);
+  TaskmanaSync.init({
+    getState: () => state,
+    applyRemote: async (s) => {
+      state = s;
+      applyTheme(state.settings.theme ?? 'system');
+      await store.save(state);
+      render();
+    },
+  });
+  renderSync();
+
+  // PWA app shell — web deployment only, never inside the extension.
+  const inExtension = typeof chrome !== 'undefined' && chrome.storage?.local;
+  if (!inExtension && 'serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js');
+  }
 }
 
 init();

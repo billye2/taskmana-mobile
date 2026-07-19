@@ -51,9 +51,19 @@ test('plan tomorrow queue promotes in order at day rollover with migration marks
     .click();
 
   await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+
+  // before any picks the preview already shows the carried-over task, marked
+  // with the › it will earn at rollover
+  const previewRows = page.locator('#plan-preview-list .preview-row');
+  await expect(previewRows.locator('.text')).toHaveText(['carried']);
+  await expect(previewRows.locator('.preview-tag')).toHaveText('carried');
+  await expect(previewRows.locator('.migrations')).toHaveText('›');
+
   await page.getByRole('button', { name: 'Add to tomorrow: planned A' }).click();
   await page.getByRole('button', { name: 'Add to tomorrow: planned B' }).click();
   await expect(page.locator('#plan-count')).toHaveText('2/6 picked');
+  // picks jump ahead of the carried task, exactly as rollover will order them
+  await expect(previewRows.locator('.text')).toHaveText(['planned A', 'planned B', 'carried']);
   await page.locator('#plan-save').click();
   await expect(page.locator('#tomorrow-note')).toHaveText('Tomorrow is planned: 2 tasks queued.');
 
@@ -111,6 +121,35 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
   await expect(page.locator('#review-badge')).toBeHidden();
   await page.locator('#someday-section summary').click();
   await expect(page.locator('#someday-list .task .text')).toHaveText(['stale task']);
+});
+
+test('previous-days history is collapsed under the footer and expands on demand', async ({ page }) => {
+  await expect(page.locator('#history-section')).toBeHidden(); // fresh state: no history
+
+  await writeStateAndReload(page, (s) => {
+    s.tasks.push({
+      id: 'hist-1',
+      text: 'shipped yesterday',
+      createdAt: 1750000000000,
+      status: 'done',
+      order: null,
+      migrationCount: 0,
+      ackMigrations: 0,
+      completedAt: 1750000001000,
+      completedOn: localDate(1),
+    });
+  });
+
+  const section = page.locator('#history-section');
+  await expect(section).toBeVisible();
+  await expect(page.locator('#history-body .task .text')).toBeHidden(); // collapsed by default
+  await section.locator('summary').click();
+  await expect(page.locator('.history-date')).toContainText('yesterday');
+  await expect(page.locator('#history-body .task .text')).toHaveText('shipped yesterday');
+
+  // open state survives a re-render (completing a task triggers one)
+  await capture(page, 'still open?');
+  await expect(page.locator('#history-body .task .text')).toBeVisible();
 });
 
 test('method hints name their authors and can be toggled off', async ({ page }) => {
@@ -220,6 +259,18 @@ test('import rejects invalid files and cancel leaves data untouched', async ({ p
   expect(confirm.type()).toBe('confirm');
   await confirm.dismiss();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
+});
+
+test('sync dialog opens signed-out with no network and explains unconfigured state', async ({ page }) => {
+  await page.locator('#sync-btn').click();
+  const dialog = page.locator('#sync-dialog');
+  await expect(dialog).toBeVisible();
+  // repo config ships empty → calm setup hint, no sign-in forms, no dot
+  await expect(page.locator('#sync-unconfigured')).toBeVisible();
+  await expect(page.locator('#sync-email-form')).toBeHidden();
+  await expect(page.locator('#sync-dot')).toBeHidden();
+  await page.locator('#sync-close').click();
+  await expect(dialog).toBeHidden();
 });
 
 test('theme toggle forces light and dark regardless of system scheme', async ({ page }) => {

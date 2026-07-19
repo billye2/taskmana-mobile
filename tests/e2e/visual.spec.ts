@@ -22,6 +22,8 @@ function seed(state: any) {
     mk('Renew passport', { status: 'today', order: 3, migrationCount: 5 }),
     mk('Email accountant about Q3'),
     mk('Learn watercolor painting', { status: 'someday' }),
+    // yesterday's done: shows the collapsed "Previous days" footer disclosure
+    mk('Fix the garage shelf', { status: 'done', completedAt: 1749900000000, completedOn: localDate(1) }),
   ];
   state.tomorrowQueue = [];
   state.lastReviewDate = localDate();

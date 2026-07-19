@@ -15,6 +15,7 @@
  * @property {number | null} completedAt
  * @property {string | null} completedOn YYYY-MM-DD the task was completed.
  * @property {number} [droppedAt]
+ * @property {number} modifiedAt Last mutation time; drives task-level sync merge.
  *
  * @typedef {Object} Settings
  * @property {boolean} focusMode
@@ -37,6 +38,7 @@ const TOP_COUNT = 3;
 const MIGRATION_WARN = 5;
 const REVIEW_INTERVAL_DAYS = 7;
 const DROPPED_RETENTION_DAYS = 30;
+const HISTORY_DAYS = 14;
 
 /** @param {Date} [d] @returns {string} */
 function todayStr(d = new Date()) {
@@ -46,7 +48,7 @@ function todayStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 
 /** @param {string} date @returns {State} */
 function initialState(date) {
@@ -76,6 +78,13 @@ const MIGRATIONS = {
       t.completedOn ??= null;
     }
     s.lastReviewDate ??= null;
+    return s;
+  },
+  // 1 -> 2: per-task modifiedAt for task-level sync merge.
+  1: (s) => {
+    for (const t of s.tasks) {
+      t.modifiedAt ??= Math.max(t.createdAt ?? 0, t.completedAt ?? 0, t.droppedAt ?? 0);
+    }
     return s;
   },
 };
@@ -108,6 +117,13 @@ function getTask(state, id) {
   return state.tasks.find((t) => t.id === id);
 }
 
+// Every task mutation stamps modifiedAt so mergeStates can pick the newer
+// copy of a task when two devices diverge.
+/** @param {Task} t */
+function touch(t) {
+  t.modifiedAt = Date.now();
+}
+
 // ---- queries ----------------------------------------------------------------
 
 // Today list = active today tasks plus tasks completed today that still hold a
@@ -138,6 +154,66 @@ function doneToday(state, date) {
   return state.tasks
     .filter((t) => t.status === 'done' && t.completedOn === date)
     .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+}
+
+// Done tasks from before `date`, grouped by day, newest day first. Filtered by
+// completedOn (not order) so a tab left open past midnight still shows
+// yesterday's dones; `limit` only caps the display — nothing is deleted.
+/**
+ * @param {State} state @param {string} date @param {number} [limit]
+ * @returns {{ date: string, tasks: Task[] }[]}
+ */
+function doneHistory(state, date, limit = HISTORY_DAYS) {
+  /** @type {Map<string, Task[]>} */
+  const byDay = new Map();
+  for (const t of state.tasks) {
+    if (t.status !== 'done' || !t.completedOn || t.completedOn >= date) continue;
+    const group = byDay.get(t.completedOn);
+    if (group) group.push(t);
+    else byDay.set(t.completedOn, [t]);
+  }
+  return [...byDay.keys()]
+    .sort()
+    .reverse()
+    .slice(0, limit)
+    .map((day) => ({
+      date: day,
+      tasks: /** @type {Task[]} */ (byDay.get(day)).sort(
+        (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)
+      ),
+    }));
+}
+
+// Ordered candidates for the next day's Today list: valid queued ids first
+// (Ivy Lee order), then carried-over unfinished today tasks, deduped. Shared
+// by rollover() and tomorrowPreview() so the preview can never drift.
+/** @param {State} state @param {string[]} queueIds @returns {Task[]} */
+function tomorrowMerge(state, queueIds) {
+  const carried = todayList(state).filter((t) => t.status === 'today');
+  const queued = queueIds
+    .map((id) => getTask(state, id))
+    .filter(
+      /** @returns {t is Task} */
+      (t) => !!t && (t.status === 'inbox' || t.status === 'today' || t.status === 'someday')
+    );
+  /** @type {Task[]} */
+  const merged = [];
+  for (const t of [...queued, ...carried]) {
+    if (!merged.includes(t)) merged.push(t);
+  }
+  return merged;
+}
+
+// What Today will look like after the next rollover if `queueIds` is saved as
+// the plan. Pure — mutates nothing; rollover() additionally bumps
+// migrationCount on carried tasks.
+/**
+ * @param {State} state @param {string[]} queueIds
+ * @returns {{ today: Task[], overflow: Task[] }}
+ */
+function tomorrowPreview(state, queueIds) {
+  const merged = tomorrowMerge(state, queueIds);
+  return { today: merged.slice(0, TODAY_CAP), overflow: merged.slice(TODAY_CAP) };
 }
 
 /** @param {State} state @returns {boolean} */
@@ -188,17 +264,19 @@ function daysBetween(fromStr, toStr) {
 function addTask(state, text) {
   const trimmed = text.trim();
   if (!trimmed) return null;
+  const now = Date.now();
   /** @type {Task} */
   const task = {
     id: makeId(),
     text: trimmed,
-    createdAt: Date.now(),
+    createdAt: now,
     status: 'inbox',
     order: null,
     migrationCount: 0,
     ackMigrations: 0,
     completedAt: null,
     completedOn: null,
+    modifiedAt: now,
   };
   state.tasks.push(task);
   return task;
@@ -208,7 +286,10 @@ function addTask(state, text) {
 function editTask(state, id, text) {
   const t = getTask(state, id);
   const trimmed = text.trim();
-  if (t && trimmed) t.text = trimmed;
+  if (t && trimmed) {
+    t.text = trimmed;
+    touch(t);
+  }
 }
 
 /** @param {State} state @param {string} id @returns {boolean} */
@@ -217,6 +298,7 @@ function promoteToToday(state, id) {
   if (!t || !todayHasRoom(state)) return false;
   t.status = 'today';
   t.order = nextOrder(state);
+  touch(t);
   return true;
 }
 
@@ -226,6 +308,7 @@ function demoteToInbox(state, id) {
   if (!t) return;
   t.status = 'inbox';
   t.order = null;
+  touch(t);
   renumber(state);
 }
 
@@ -242,6 +325,7 @@ function toggleDone(state, id, date) {
     t.completedAt = Date.now();
     t.completedOn = date;
   }
+  touch(t);
 }
 
 /** @param {State} state @param {string} id @param {number} delta */
@@ -252,6 +336,8 @@ function moveInToday(state, id, delta) {
   if (idx === -1 || !swapWith) return;
   const t = list[idx];
   [t.order, swapWith.order] = [swapWith.order, t.order];
+  touch(t);
+  touch(swapWith);
 }
 
 /** @param {State} state @param {string} id */
@@ -260,6 +346,7 @@ function sendToSomeday(state, id) {
   if (!t) return;
   t.status = 'someday';
   t.order = null;
+  touch(t);
   removeFromQueue(state, id);
   renumber(state);
 }
@@ -271,6 +358,7 @@ function dropTask(state, id) {
   t.status = 'dropped';
   t.order = null;
   t.droppedAt = Date.now();
+  touch(t);
   removeFromQueue(state, id);
   renumber(state);
 }
@@ -278,7 +366,10 @@ function dropTask(state, id) {
 /** @param {State} state @param {string} id */
 function keepMigrated(state, id) {
   const t = getTask(state, id);
-  if (t) t.ackMigrations = t.migrationCount;
+  if (t) {
+    t.ackMigrations = t.migrationCount;
+    touch(t);
+  }
 }
 
 /** @param {State} state @param {string[]} ids */
@@ -305,7 +396,10 @@ function nextOrder(state) {
 /** @param {State} state */
 function renumber(state) {
   todayList(state).forEach((t, i) => {
-    t.order = i;
+    if (t.order !== i) {
+      t.order = i;
+      touch(t);
+    }
   });
 }
 
@@ -337,6 +431,90 @@ function isValidState(value) {
   );
 }
 
+// ---- sync merge -------------------------------------------------------------
+
+/** @param {Task} x @param {Task} y @returns {Task} */
+function newerTask(x, y) {
+  if ((x.modifiedAt ?? 0) !== (y.modifiedAt ?? 0)) {
+    return (x.modifiedAt ?? 0) > (y.modifiedAt ?? 0) ? x : y;
+  }
+  // Exact-tie fallback (near-always identical copies): any deterministic,
+  // argument-order-independent pick keeps the merge commutative.
+  return JSON.stringify(x) >= JSON.stringify(y) ? x : y;
+}
+
+/** @param {State} s @returns {number} */
+function activityStamp(s) {
+  return s.tasks.reduce((m, t) => Math.max(m, t.modifiedAt ?? 0), 0);
+}
+
+// Deterministic task-level merge of two same-version states (migrate both
+// first). Pure — returns a new state, mutates neither input, stamps nothing:
+// per-device stamping here would make the two devices' merges diverge.
+/** @param {State} a @param {State} b @param {number} [now] @returns {State} */
+function mergeStates(a, b, now = Date.now()) {
+  /** @type {Map<string, Task>} */
+  const byId = new Map();
+  for (const t of a.tasks) byId.set(t.id, t);
+  for (const t of b.tasks) {
+    const mine = byId.get(t.id);
+    byId.set(t.id, mine ? newerTask(mine, t) : t);
+  }
+
+  // In-merge prune: a dropped task past retention was (or will be) pruned by
+  // rollover on some device — dropping it here stops resurrection ping-pong
+  // without needing tombstones (drop-then-prune is the only true deletion).
+  const cutoff = now - DROPPED_RETENTION_DAYS * 86400000;
+  const tasks = [...byId.values()]
+    .filter((t) => !(t.status === 'dropped' && (t.droppedAt ?? 0) < cutoff))
+    .map((t) => ({ ...t })) // copies: normalization below must not touch inputs
+    .sort((x, y) => (x.id < y.id ? -1 : 1)); // canonical order → commutative merge
+  const surviving = new Set(tasks.map((t) => t.id));
+
+  // Scalars come from the side with the newer overall activity; tie broken
+  // deterministically so merge(a, b) and merge(b, a) agree.
+  const sa = activityStamp(a);
+  const sb = activityStamp(b);
+  const newer =
+    sa !== sb ? (sa > sb ? a : b) : JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+
+  /** @type {State} */
+  const merged = {
+    version: STATE_VERSION,
+    tasks,
+    lastRolloverDate:
+      a.lastRolloverDate > b.lastRolloverDate ? a.lastRolloverDate : b.lastRolloverDate,
+    lastReviewDate:
+      a.lastReviewDate && b.lastReviewDate
+        ? a.lastReviewDate > b.lastReviewDate
+          ? a.lastReviewDate
+          : b.lastReviewDate
+        : a.lastReviewDate ?? b.lastReviewDate,
+    tomorrowQueue: newer.tomorrowQueue.filter((id) => surviving.has(id)),
+    settings: { ...newer.settings },
+  };
+
+  // The union can hold duplicate `order` values or more than TODAY_CAP slot
+  // holders. Re-slot deterministically: total sort, renumber, overflow out.
+  const slotted = merged.tasks
+    .filter((t) => (t.status === 'today' || t.status === 'done') && t.order !== null)
+    .sort(
+      (x, y) =>
+        (x.order ?? 0) - (y.order ?? 0) ||
+        (x.modifiedAt ?? 0) - (y.modifiedAt ?? 0) ||
+        (x.id < y.id ? -1 : 1)
+    );
+  slotted.forEach((t, i) => {
+    t.order = i;
+  });
+  for (const t of slotted.slice(TODAY_CAP)) {
+    if (t.status === 'today') t.status = 'inbox';
+    t.order = null;
+  }
+
+  return merged;
+}
+
 // ---- day rollover -----------------------------------------------------------
 
 // Runs on every page load; only acts when the stored date is behind today.
@@ -348,34 +526,30 @@ function rollover(state, date) {
   if (state.lastRolloverDate === date) return false;
 
   for (const t of state.tasks) {
-    if (t.status === 'done') t.order = null; // off the today list, into the log
-    if (t.status === 'today' && t.order !== null) t.migrationCount += 1;
+    if (t.status === 'done' && t.order !== null) {
+      t.order = null; // off the today list, into the log
+      touch(t);
+    }
+    if (t.status === 'today' && t.order !== null) {
+      t.migrationCount += 1;
+      touch(t);
+    }
   }
 
   // New today list: planned queue first (Ivy Lee order), then carried-over
   // unfinished tasks. Overflow past the cap goes back to the inbox.
-  const carried = todayList(state).filter((t) => t.status === 'today');
-  const queued = state.tomorrowQueue
-    .map((id) => getTask(state, id))
-    .filter(
-      /** @returns {t is Task} */
-      (t) => !!t && (t.status === 'inbox' || t.status === 'today' || t.status === 'someday')
-    );
-
-  /** @type {Task[]} */
-  const newToday = [];
-  for (const t of [...queued, ...carried]) {
-    if (!newToday.includes(t)) newToday.push(t);
-  }
+  const newToday = tomorrowMerge(state, state.tomorrowQueue);
   for (const t of state.tasks) {
     if (t.status === 'today') {
       t.status = 'inbox';
       t.order = null;
+      touch(t);
     }
   }
   newToday.slice(0, TODAY_CAP).forEach((t, i) => {
     t.status = 'today';
     t.order = i;
+    touch(t);
   });
 
   const cutoff = Date.now() - DROPPED_RETENTION_DAYS * 86400000;
@@ -391,10 +565,10 @@ function rollover(state, date) {
 return {
   TODAY_CAP, TOP_COUNT, MIGRATION_WARN, REVIEW_INTERVAL_DAYS, STATE_VERSION,
   todayStr, initialState, migrateState, getTask,
-  todayList, inboxTasks, somedayTasks, doneToday, todayHasRoom,
-  currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue,
+  todayList, inboxTasks, somedayTasks, doneToday, doneHistory, todayHasRoom, tomorrowPreview,
+  currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue, daysBetween,
   addTask, editTask, promoteToToday, demoteToInbox, toggleDone,
   moveInToday, sendToSomeday, dropTask, keepMigrated,
-  setTomorrowQueue, markReviewed, rollover, isValidState,
+  setTomorrowQueue, markReviewed, rollover, isValidState, mergeStates,
 };
 })();
