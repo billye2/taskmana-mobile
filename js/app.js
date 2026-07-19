@@ -382,6 +382,50 @@ $('done-toggle').addEventListener('click', () => {
   $('done-list').hidden = !$('done-list').hidden;
 });
 
+// ---- backup: export / import ------------------------------------------------
+
+$('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = el('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `taskmana-backup-${M.todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$('import-btn').addEventListener('click', () => $input('import-file').click());
+
+$input('import-file').addEventListener('change', async () => {
+  const fileInput = $input('import-file');
+  const file = fileInput.files?.[0];
+  fileInput.value = ''; // allow picking the same file again later
+  if (!file) return;
+
+  /** @type {unknown} */
+  let parsed;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    alert('That file is not valid JSON.');
+    return;
+  }
+  if (!M.isValidState(parsed)) {
+    alert('That file is not a Taskmana backup.');
+    return;
+  }
+  const current = state.tasks.length;
+  const incoming = parsed.tasks.length;
+  if (!confirm(`Replace your current ${current} task${current === 1 ? '' : 's'} with the backup's ${incoming}?`)) {
+    return;
+  }
+  state = parsed;
+  // The backup may be from an earlier day — run the normal morning rollover.
+  M.rollover(state, M.todayStr());
+  state.settings.theme ??= 'system';
+  applyTheme(state.settings.theme);
+  await persistAndRender();
+});
+
 // ---- weekly review ----------------------------------------------------------
 
 /** @type {Task[]} */

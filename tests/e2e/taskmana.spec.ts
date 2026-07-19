@@ -151,6 +151,64 @@ test('review and plan dialogs have cyclable examples that follow the hints toggl
   await expect(planExample).toBeHidden();
 });
 
+test('export downloads a dated backup and import restores it', async ({ page }) => {
+  await capture(page, 'irreplaceable task');
+  await capture(page, 'another keeper');
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#export-btn').click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^taskmana-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const backupPath = await download.path();
+
+  // simulate data loss
+  await writeStateAndReload(page, (s) => {
+    s.tasks = [];
+  });
+  await expect(page.locator('#inbox-list .task')).toHaveCount(0);
+
+  page.once('dialog', (d) => d.accept()); // confirm the replace prompt
+  await page.locator('#import-file').setInputFiles(backupPath!);
+  await expect(page.locator('#inbox-list .task .text')).toHaveText([
+    'another keeper',
+    'irreplaceable task',
+  ]);
+
+  // restored data is persisted, not just rendered
+  await page.reload();
+  await expect(page.locator('#inbox-list .task')).toHaveCount(2);
+});
+
+test('import rejects invalid files and cancel leaves data untouched', async ({ page }) => {
+  await capture(page, 'safe task');
+
+  // not a Taskmana backup: alert, nothing changes
+  page.once('dialog', (d) => {
+    expect(d.type()).toBe('alert');
+    void d.accept();
+  });
+  await page.locator('#import-file').setInputFiles({
+    name: 'junk.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"hello":"world"}'),
+  });
+  await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
+
+  // valid backup but user cancels the confirm: nothing changes
+  const empty = { tasks: [], lastRolloverDate: '2020-01-01', tomorrowQueue: [], lastReviewDate: null, settings: { focusMode: false } };
+  page.once('dialog', (d) => {
+    expect(d.type()).toBe('confirm');
+    void d.dismiss();
+  });
+  await page.locator('#import-file').setInputFiles({
+    name: 'empty.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(empty)),
+  });
+  await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
+});
+
 test('theme toggle forces light and dark regardless of system scheme', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   const themeBtn = page.locator('#theme-toggle');

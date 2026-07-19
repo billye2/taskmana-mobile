@@ -267,6 +267,34 @@ function renumber(state) {
   });
 }
 
+// Shape check for imported backups — enough to guarantee the app can render
+// and mutate the state without crashing.
+/** @param {unknown} value @returns {value is State} */
+function isValidState(value) {
+  if (typeof value !== 'object' || value === null) return false;
+  const s = /** @type {Record<string, unknown>} */ (value);
+  /** @type {string[]} */
+  const statuses = ['inbox', 'today', 'someday', 'done', 'dropped'];
+  return (
+    Array.isArray(s.tasks) &&
+    s.tasks.every((raw) => {
+      const t = /** @type {Record<string, unknown>} */ (raw);
+      return (
+        !!t &&
+        typeof t === 'object' &&
+        typeof t.id === 'string' &&
+        typeof t.text === 'string' &&
+        typeof t.status === 'string' &&
+        statuses.includes(t.status)
+      );
+    }) &&
+    typeof s.lastRolloverDate === 'string' &&
+    Array.isArray(s.tomorrowQueue) &&
+    typeof s.settings === 'object' &&
+    s.settings !== null
+  );
+}
+
 // ---- day rollover -----------------------------------------------------------
 
 // Runs on every page load; only acts when the stored date is behind today.
@@ -325,6 +353,6 @@ return {
   currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue,
   addTask, editTask, promoteToToday, demoteToInbox, toggleDone,
   moveInToday, sendToSomeday, dropTask, keepMigrated,
-  setTomorrowQueue, markReviewed, rollover,
+  setTomorrowQueue, markReviewed, rollover, isValidState,
 };
 })();

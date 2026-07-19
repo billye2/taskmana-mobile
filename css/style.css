@@ -500,6 +500,16 @@ body.hints-off .hint {
   padding-top: 14px;
 }
 
+.footer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.footer-spacer {
+  flex: 1;
+}
+
 .link-btn {
   border: none;
   background: none;

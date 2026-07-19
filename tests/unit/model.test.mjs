@@ -213,6 +213,23 @@ test('setTomorrowQueue caps at 6', () => {
   assert.equal(s.tomorrowQueue.length, 6);
 });
 
+test('isValidState accepts real states and rejects malformed backups', () => {
+  const s = freshState();
+  assert.equal(M.isValidState(s), true);
+  add(s, 'a task');
+  assert.equal(M.isValidState(JSON.parse(JSON.stringify(s))), true);
+
+  assert.equal(M.isValidState(null), false);
+  assert.equal(M.isValidState('[]'), false);
+  assert.equal(M.isValidState({}), false);
+  assert.equal(M.isValidState({ ...s, tasks: 'nope' }), false);
+  assert.equal(M.isValidState({ ...s, tasks: [{ id: 1, text: 'x', status: 'inbox' }] }), false);
+  assert.equal(M.isValidState({ ...s, tasks: [{ id: 'x', text: 'x', status: 'bogus' }] }), false);
+  assert.equal(M.isValidState({ ...s, lastRolloverDate: null }), false);
+  assert.equal(M.isValidState({ ...s, tomorrowQueue: null }), false);
+  assert.equal(M.isValidState({ ...s, settings: null }), false);
+});
+
 test('demoteToInbox renumbers the remaining today list contiguously', () => {
   const s = freshState();
   const [a, b, c] = ['a', 'b', 'c'].map((x) => add(s, x));

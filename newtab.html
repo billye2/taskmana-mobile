@@ -54,7 +54,13 @@
     </details>
 
     <footer class="footer">
-      <button id="done-toggle" class="link-btn" hidden></button>
+      <div class="footer-row">
+        <button id="done-toggle" class="link-btn" hidden></button>
+        <span class="footer-spacer"></span>
+        <button id="export-btn" class="link-btn" title="Download your tasks as a JSON backup file">Export</button>
+        <button id="import-btn" class="link-btn" title="Restore tasks from a JSON backup file">Import</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden />
+      </div>
       <ul id="done-list" class="task-list plain done-log" hidden></ul>
     </footer>
   </main>

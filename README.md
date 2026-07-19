@@ -37,10 +37,8 @@ npm test            # all of the above
 
 Visual regression baselines live in `tests/e2e/visual.spec.ts-snapshots/`; after an intentional UI change, refresh them with `npx playwright test --update-snapshots`.
 
-## Data
+## Data & backups
 
-State lives in `chrome.storage.local` under the key `taskmana-state`. To back it up, run this in DevTools on the new tab page:
+State lives in `chrome.storage.local` under the key `taskmana-state`. It survives browser restarts and extension reloads, but is deleted if you **remove** the extension, and an unpacked extension loaded from a **moved or renamed folder** counts as a new extension with empty storage.
 
-```js
-chrome.storage.local.get('taskmana-state', s => console.log(JSON.stringify(s)))
-```
+Use the **Export** button in the footer to download a dated JSON backup (`taskmana-backup-YYYY-MM-DD.json`), and **Import** to restore one — it validates the file and asks before replacing your current tasks.
