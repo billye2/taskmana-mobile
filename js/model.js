@@ -22,6 +22,7 @@
  * @property {boolean} [showHints]
  *
  * @typedef {Object} State
+ * @property {number} [version] Schema version; migrateState upgrades older shapes.
  * @property {Task[]} tasks
  * @property {string} lastRolloverDate YYYY-MM-DD of the last day rollover.
  * @property {string[]} tomorrowQueue Task ids picked for tomorrow, in Ivy Lee order.
@@ -45,15 +46,56 @@ function todayStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+const STATE_VERSION = 1;
+
 /** @param {string} date @returns {State} */
 function initialState(date) {
   return {
+    version: STATE_VERSION,
     tasks: [],
     lastRolloverDate: date,
     tomorrowQueue: [],
     lastReviewDate: null,
     settings: { focusMode: false },
   };
+}
+
+// Stepwise migrations: MIGRATIONS[n] upgrades a version-n state to n+1.
+// When the State shape changes, bump STATE_VERSION and add one entry here —
+// both stored state and imported backups pass through migrateState.
+/** @type {Record<number, (s: any) => any>} */
+const MIGRATIONS = {
+  // 0 -> 1: pre-versioning states; backfill fields added after launch.
+  0: (s) => {
+    s.settings.theme ??= 'system';
+    s.settings.showHints ??= true;
+    for (const t of s.tasks) {
+      t.ackMigrations ??= t.migrationCount ?? 0;
+      t.migrationCount ??= 0;
+      t.completedAt ??= null;
+      t.completedOn ??= null;
+    }
+    s.lastReviewDate ??= null;
+    return s;
+  },
+};
+
+// Upgrade a stored or imported state to the current schema. Returns null for
+// null input; unknown future versions are returned untouched.
+/** @param {State | null} state @returns {State | null} */
+function migrateState(state) {
+  if (!state) return null;
+  /** @type {any} */
+  let s = state;
+  let v = typeof s.version === 'number' ? s.version : 0;
+  while (v < STATE_VERSION) {
+    const step = MIGRATIONS[v];
+    if (!step) break;
+    s = step(s);
+    v += 1;
+  }
+  s.version = Math.max(v, STATE_VERSION);
+  return s;
 }
 
 /** @returns {string} */
@@ -347,8 +389,8 @@ function rollover(state, date) {
 }
 
 return {
-  TODAY_CAP, TOP_COUNT, MIGRATION_WARN, REVIEW_INTERVAL_DAYS,
-  todayStr, initialState, getTask,
+  TODAY_CAP, TOP_COUNT, MIGRATION_WARN, REVIEW_INTERVAL_DAYS, STATE_VERSION,
+  todayStr, initialState, migrateState, getTask,
   todayList, inboxTasks, somedayTasks, doneToday, todayHasRoom,
   currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue,
   addTask, editTask, promoteToToday, demoteToInbox, toggleDone,

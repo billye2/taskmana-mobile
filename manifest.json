@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Taskmana",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A calm personal task system: daily top-3, brain dump, bullet-journal migration, and an Ivy Lee queue — on every new tab.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

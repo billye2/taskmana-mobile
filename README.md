@@ -41,6 +41,8 @@ npm run test:e2e    # Playwright: loads the real extension; e2e + axe a11y + vis
 npm test            # all of the above
 ```
 
+CI (GitHub Actions) runs typecheck + unit + e2e on every push to `main` and uploads a versioned `taskmana-<version>.zip` artifact built from just the runtime files. Releases follow a 0–9-per-segment scheme (`1.0.1 … 1.0.9 → 1.1.0`); `npm run bump` advances `manifest.json` + `package.json` together and `npm run package` builds the zip locally into `dist/`. Stored state carries a schema `version`; `TaskmanaModel.migrateState` upgrades older shapes (and old backup files on import) stepwise — when changing the `State` shape, bump `STATE_VERSION` and add a migration entry.
+
 The e2e suite launches Chromium with the extension actually loaded (`chrome://newtab` → the override page), so capture, `chrome.storage` persistence, day rollover, review, planning, theme, hints, and export/import are all exercised end-to-end. Accessibility tests run axe (WCAG 2.1 AA) on the main page in both color schemes and on both dialogs. Visual regression baselines live in `tests/e2e/visual.spec.ts-snapshots/`; after an intentional UI change, refresh them with `npx playwright test --update-snapshots`.
 
 Gotchas learned the hard way (preserved here so they aren't relearned):

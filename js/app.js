@@ -421,7 +421,7 @@ $input('import-file').addEventListener('change', async () => {
   if (!confirm(`Replace your current ${current} task${current === 1 ? '' : 's'} with the backup's ${incoming}?`)) {
     return;
   }
-  state = parsed;
+  state = /** @type {State} */ (M.migrateState(parsed));
   // The backup may be from an earlier day — run the normal morning rollover.
   M.rollover(state, M.todayStr());
   state.settings.theme ??= 'system';
@@ -566,7 +566,7 @@ $('plan-cancel').addEventListener('click', () => $dialog('plan-dialog').close())
 // ---- boot -------------------------------------------------------------------
 
 async function init() {
-  state = (await store.load()) ?? M.initialState(M.todayStr());
+  state = M.migrateState(await store.load()) ?? M.initialState(M.todayStr());
   state.settings.theme ??= 'system';
   applyTheme(state.settings.theme);
   if (M.rollover(state, M.todayStr())) await store.save(state);

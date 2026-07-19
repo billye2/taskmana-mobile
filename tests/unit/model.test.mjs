@@ -230,6 +230,38 @@ test('isValidState accepts real states and rejects malformed backups', () => {
   assert.equal(M.isValidState({ ...s, settings: null }), false);
 });
 
+test('migrateState upgrades a pre-versioning state and backfills new fields', () => {
+  // Shape of a state saved before schema versioning existed
+  const legacy = {
+    tasks: [{ id: 'a', text: 'old task', createdAt: 1, status: 'today', order: 0, migrationCount: 3 }],
+    lastRolloverDate: '2026-07-01',
+    tomorrowQueue: [],
+    lastReviewDate: null,
+    settings: { focusMode: true },
+  };
+  const migrated = M.migrateState(legacy);
+  assert.equal(migrated.version, M.STATE_VERSION);
+  assert.equal(migrated.settings.theme, 'system');
+  assert.equal(migrated.settings.showHints, true);
+  const t = migrated.tasks[0];
+  assert.equal(t.ackMigrations, 3); // backfilled to migrationCount: no surprise prompts
+  assert.equal(t.completedAt, null);
+  assert.equal(t.completedOn, null);
+  assert.equal(migrated.settings.focusMode, true); // existing data untouched
+  assert.equal(M.isValidState(migrated), true);
+});
+
+test('migrateState is idempotent and passes through null and future versions', () => {
+  const s = freshState();
+  assert.equal(s.version, M.STATE_VERSION);
+  const once = M.migrateState(JSON.parse(JSON.stringify(s)));
+  const twice = M.migrateState(JSON.parse(JSON.stringify(once)));
+  assert.deepEqual(once, twice);
+  assert.equal(M.migrateState(null), null);
+  const future = { ...freshState(), version: M.STATE_VERSION + 5 };
+  assert.equal(M.migrateState(future).version, M.STATE_VERSION + 5); // never downgraded
+});
+
 test('demoteToInbox renumbers the remaining today list contiguously', () => {
   const s = freshState();
   const [a, b, c] = ['a', 'b', 'c'].map((x) => add(s, x));
