@@ -23,7 +23,7 @@ If the new tab doesn't change: check that Taskmana appears in `chrome://extensio
 
 ## iPhone / web app
 
-The same files deploy to Vercel as an installable web app (`vercel.json` rewrites `/` to `newtab.html`; `manifest.webmanifest` + `sw.js` make it a PWA with an offline app shell). On the phone: open the Vercel URL in Safari → Share → **Add to Home Screen**. Touch devices get always-visible row actions, larger tap targets, and tap-to-edit (desktop keeps double-click) via an `@media (hover: none)` block. The service worker is only registered on the web deployment — never inside the extension. `scripts/bump-version.mjs` keeps the service-worker cache key in step with the release version.
+The same files deploy to Vercel as an installable web app (`vercel.json` rewrites `/` to `newtab.html`; `manifest.webmanifest` + `sw.js` make it a PWA with an offline app shell). Deploy with `vercel --prod` from the repo root (first time: `vercel login`; `.vercelignore` keeps tests/tooling out of the upload) — or connect the repo in the Vercel dashboard for deploy-on-push. On the phone: open the Vercel URL in Safari → Share → **Add to Home Screen**. Touch devices get always-visible row actions, larger tap targets, and tap-to-edit (desktop keeps double-click) via an `@media (hover: none)` block. The service worker is only registered on the web deployment — never inside the extension. `scripts/bump-version.mjs` keeps the service-worker cache key in step with the release version.
 
 ## Sync (optional)
 
