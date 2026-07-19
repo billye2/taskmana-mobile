@@ -409,6 +409,18 @@ body.hints-off .hint {
   pointer-events: none;
 }
 
+/* Focus mode: the one task you're working on is unmissable */
+#today-list .task.focused .text {
+  font-size: 2em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+#today-list .task.focused .check {
+  margin-top: 9px;
+}
+
 .migrations {
   color: var(--amber);
   font-weight: 700;

@@ -213,8 +213,8 @@ function renderToday(today) {
     const row = el('li', 'task');
     if (idx < M.TOP_COUNT) row.classList.add('top');
     if (task.status === 'done') row.classList.add('done-row');
-    if (state.settings.focusMode && task.status === 'today' && task !== focusTask) {
-      row.classList.add('locked');
+    if (state.settings.focusMode && task.status === 'today') {
+      row.classList.add(task === focusTask ? 'focused' : 'locked');
     }
 
     const check = el('input', 'check');

@@ -33,10 +33,14 @@ test('promote to today, complete, reorder, and focus mode locking', async ({ pag
     .click();
   await expect(page.locator('#today-list .task .text')).toHaveText(['one', 'two', 'four', 'three']);
 
-  // focus mode locks everything but the first unfinished task
+  // focus mode locks everything but the first unfinished task, which doubles in size
   await page.getByRole('button', { name: 'Focus' }).click();
   await expect(page.locator('#today-list .task.locked .text')).toHaveText(['four', 'three']);
-  await expect(page.locator('#today-list .task', { hasText: 'two' })).not.toHaveClass(/locked/);
+  const focused = page.locator('#today-list .task.focused');
+  await expect(focused.locator('.text')).toHaveText('two');
+  await expect(focused.locator('.text')).toHaveCSS('font-size', '28px'); // 2x the 14px base
+  await page.getByRole('checkbox', { name: 'Mark done: two' }).check();
+  await expect(page.locator('#today-list .task.focused .text')).toHaveText('four'); // focus advances
 });
 
 test('plan tomorrow queue promotes in order at day rollover with migration marks', async ({ page }) => {
