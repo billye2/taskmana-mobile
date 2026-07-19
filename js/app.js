@@ -384,14 +384,17 @@ $('done-toggle').addEventListener('click', () => {
 
 // ---- backup: export / import ------------------------------------------------
 
-$('export-btn').addEventListener('click', () => {
+function exportBackup() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const a = el('a');
   a.href = URL.createObjectURL(blob);
   a.download = `taskmana-backup-${M.todayStr()}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-});
+}
+
+$('export-btn').addEventListener('click', exportBackup);
+$('review-export').addEventListener('click', exportBackup);
 
 $('import-btn').addEventListener('click', () => $input('import-file').click());
 
@@ -448,13 +451,16 @@ function renderReviewCard() {
     $('review-text').textContent = total === 0
       ? 'Nothing to review — inbox is clear.'
       : 'Review done. Your list is honest again.';
-    $('review-meta').textContent = '';
+    $('review-meta').textContent =
+      total === 0 ? '' : 'Fresh list — a good moment to back it up.';
     $('review-progress').textContent = '';
     actions.hidden = true;
+    $('review-done-actions').hidden = total === 0;
     return;
   }
 
   actions.hidden = false;
+  $('review-done-actions').hidden = true;
   $('review-text').textContent = task.text;
   const bits = [];
   if (task.status === 'someday') bits.push('parked in Someday');

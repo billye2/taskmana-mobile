@@ -89,10 +89,19 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
   const reviewActions = page.locator('#review-actions');
   await expect(page.locator('#review-text')).toHaveText('stale task');
   await expect(page.locator('#review-meta')).toContainText('carried over 5×');
+  await expect(page.locator('#review-export')).toBeHidden(); // no nudge mid-review
   await reviewActions.getByRole('button', { name: 'Someday' }).click();
   await expect(page.locator('#review-text')).toHaveText('inbox task');
   await reviewActions.getByRole('button', { name: 'This week' }).click();
   await expect(page.locator('#review-text')).toContainText('Review done');
+
+  // finishing the review nudges a backup and exports in one click
+  await expect(page.locator('#review-meta')).toContainText('back it up');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#review-export').click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^taskmana-backup-\d{4}-\d{2}-\d{2}\.json$/);
   await page.locator('#review-close').click();
 
   await expect(page.locator('#review-badge')).toBeHidden();
@@ -184,28 +193,28 @@ test('import rejects invalid files and cancel leaves data untouched', async ({ p
   await capture(page, 'safe task');
 
   // not a Taskmana backup: alert, nothing changes
-  page.once('dialog', (d) => {
-    expect(d.type()).toBe('alert');
-    void d.accept();
-  });
+  const alertPromise = page.waitForEvent('dialog');
   await page.locator('#import-file').setInputFiles({
     name: 'junk.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{"hello":"world"}'),
   });
+  const alert = await alertPromise;
+  expect(alert.type()).toBe('alert');
+  await alert.accept();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
 
   // valid backup but user cancels the confirm: nothing changes
   const empty = { tasks: [], lastRolloverDate: '2020-01-01', tomorrowQueue: [], lastReviewDate: null, settings: { focusMode: false } };
-  page.once('dialog', (d) => {
-    expect(d.type()).toBe('confirm');
-    void d.dismiss();
-  });
+  const confirmPromise = page.waitForEvent('dialog');
   await page.locator('#import-file').setInputFiles({
     name: 'empty.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(empty)),
   });
+  const confirm = await confirmPromise;
+  expect(confirm.type()).toBe('confirm');
+  await confirm.dismiss();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
 });
 
