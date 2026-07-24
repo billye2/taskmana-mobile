@@ -260,6 +260,45 @@ test('rollover prunes dropped tasks older than 30 days but keeps recent ones', (
   assert.deepEqual(s.tasks.filter((t) => t.status === 'dropped').map((t) => t.text), ['new drop']);
 });
 
+test('droppedTasks lists the recycle bin newest drop first', () => {
+  const s = freshState();
+  const [a, b] = ['first drop', 'second drop'].map((x) => add(s, x));
+  M.dropTask(s, a.id);
+  M.dropTask(s, b.id);
+  a.droppedAt = Date.now() - 1000; // force a stable order despite same-ms drops
+  assert.deepEqual(M.droppedTasks(s).map((t) => t.text), ['second drop', 'first drop']);
+});
+
+test('restoreDropped returns a dropped task to the inbox', () => {
+  const s = freshState();
+  const t = add(s, 'oops');
+  M.dropTask(s, t.id);
+  M.restoreDropped(s, t.id);
+  assert.equal(t.status, 'inbox');
+  assert.equal(t.droppedAt, undefined);
+  assert.deepEqual(M.inboxTasks(s).map((x) => x.id), [t.id]);
+  assert.deepEqual(M.droppedTasks(s), []);
+});
+
+test('restoreDropped ignores tasks that are not in the recycle bin', () => {
+  const s = freshState();
+  const t = add(s, 'active');
+  M.promoteToToday(s, t.id);
+  M.restoreDropped(s, t.id);
+  assert.equal(t.status, 'today');
+});
+
+test('droppedDaysLeft counts down from 30 and bottoms out at 0', () => {
+  const s = freshState();
+  const t = add(s, 'x');
+  M.dropTask(s, t.id);
+  const now = Date.now();
+  assert.equal(M.droppedDaysLeft(t, now), 30);
+  assert.equal(M.droppedDaysLeft(t, now + 29 * 86400000), 1);
+  assert.equal(M.droppedDaysLeft(t, now + 30 * 86400000), 0);
+  assert.equal(M.droppedDaysLeft(t, now + 45 * 86400000), 0);
+});
+
 test('migration decision appears at 5 carries and is silenced by keepMigrated', () => {
   const s = freshState();
   const t = add(s, 'stale');

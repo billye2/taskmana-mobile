@@ -192,7 +192,8 @@ body {
 }
 
 .section-head,
-.someday summary {
+.someday summary,
+.recycle summary {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -276,25 +277,41 @@ body.hints-off .hint {
   padding: 6px 2px;
 }
 
-.someday summary {
+.someday summary,
+.recycle summary {
   cursor: pointer;
   list-style: none;
   user-select: none;
 }
 
-.someday summary::-webkit-details-marker {
+.someday summary::-webkit-details-marker,
+.recycle summary::-webkit-details-marker {
   display: none;
 }
 
-.someday summary::before {
+.someday summary::before,
+.recycle summary::before {
   content: "▸";
   color: var(--faint);
   font-size: 9px;
   margin-right: 2px;
 }
 
-.someday[open] summary::before {
+.someday[open] summary::before,
+.recycle[open] summary::before {
   content: "▾";
+}
+
+/* Recycle-bin rows: muted text, per-row countdown to the 30-day prune */
+.recycle .text {
+  color: var(--muted-fg);
+}
+
+.expires {
+  display: block;
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 1px;
 }
 
 /* ---- task rows ---- */

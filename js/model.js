@@ -149,6 +149,23 @@ function somedayTasks(state) {
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
+// Recycle bin contents: dropped tasks, newest drop first. Rollover prunes
+// them after DROPPED_RETENTION_DAYS, so this is also the restore window.
+/** @param {State} state @returns {Task[]} */
+function droppedTasks(state) {
+  return state.tasks
+    .filter((t) => t.status === 'dropped')
+    .sort((a, b) => (b.droppedAt ?? 0) - (a.droppedAt ?? 0));
+}
+
+// Whole days until rollover prunes a dropped task; 0 means it can vanish at
+// the next day rollover.
+/** @param {Task} task @param {number} [now] @returns {number} */
+function droppedDaysLeft(task, now = Date.now()) {
+  const elapsed = Math.floor((now - (task.droppedAt ?? now)) / 86400000);
+  return Math.max(0, DROPPED_RETENTION_DAYS - elapsed);
+}
+
 /** @param {State} state @param {string} date @returns {Task[]} */
 function doneToday(state, date) {
   return state.tasks
@@ -364,6 +381,16 @@ function dropTask(state, id) {
 }
 
 /** @param {State} state @param {string} id */
+function restoreDropped(state, id) {
+  const t = getTask(state, id);
+  if (!t || t.status !== 'dropped') return;
+  t.status = 'inbox';
+  t.order = null;
+  delete t.droppedAt;
+  touch(t);
+}
+
+/** @param {State} state @param {string} id */
 function keepMigrated(state, id) {
   const t = getTask(state, id);
   if (t) {
@@ -564,11 +591,13 @@ function rollover(state, date) {
 
 return {
   TODAY_CAP, TOP_COUNT, MIGRATION_WARN, REVIEW_INTERVAL_DAYS, STATE_VERSION,
+  DROPPED_RETENTION_DAYS,
   todayStr, initialState, migrateState, getTask,
-  todayList, inboxTasks, somedayTasks, doneToday, doneHistory, todayHasRoom, tomorrowPreview,
+  todayList, inboxTasks, somedayTasks, droppedTasks, droppedDaysLeft,
+  doneToday, doneHistory, todayHasRoom, tomorrowPreview,
   currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue, daysBetween,
   addTask, editTask, promoteToToday, demoteToInbox, toggleDone,
-  moveInToday, sendToSomeday, dropTask, keepMigrated,
+  moveInToday, sendToSomeday, dropTask, restoreDropped, keepMigrated,
   setTomorrowQueue, markReviewed, rollover, isValidState, mergeStates,
 };
 })();

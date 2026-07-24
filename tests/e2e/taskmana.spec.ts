@@ -154,7 +154,8 @@ test('previous-days history is collapsed under the footer and expands on demand'
 
 test('method hints name their authors and can be toggled off', async ({ page }) => {
   const hints = page.locator('.hint:not(.hint-example)');
-  await expect(hints).toHaveCount(3);
+  await expect(hints).toHaveCount(4); // Today, Inbox, Someday, Recycle bin
+  await expect(hints.nth(3)).toContainText('30 days');
   await expect(hints.nth(0)).toContainText('Ivy Lee');
   await expect(hints.nth(0)).toContainText('Ryder Carroll');
   await expect(hints.nth(1)).toContainText('David Allen');
@@ -285,4 +286,32 @@ test('theme toggle forces light and dark regardless of system scheme', async ({ 
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
   await page.reload();
   await expect(page.locator('#theme-toggle')).toHaveText('Dark'); // persisted
+});
+
+test('dropped tasks land in the recycle bin and can be restored to the inbox', async ({ page }) => {
+  await capture(page, 'keep me');
+  await capture(page, 'oops');
+  await expect(page.locator('#recycle-section')).toBeHidden();
+
+  await page
+    .locator('#inbox-list .task', { hasText: 'oops' })
+    .getByRole('button', { name: 'Drop: oops' })
+    .click();
+  await expect(page.locator('#inbox-list .task .text')).toHaveText(['keep me']);
+
+  const recycle = page.locator('#recycle-section');
+  await expect(recycle).toBeVisible();
+  await expect(page.locator('#recycle-count')).toHaveText('1');
+  await recycle.locator('summary').click();
+  const row = page.locator('#recycle-list .task', { hasText: 'oops' });
+  await expect(row.locator('.expires')).toHaveText('expires in 30 days');
+
+  await row.getByRole('button', { name: 'Restore to inbox: oops' }).click();
+  await expect(recycle).toBeHidden();
+  await expect(page.locator('#inbox-list .task .text')).toHaveText(['oops', 'keep me']);
+
+  // survives reload: still in the inbox, recycle bin still empty
+  await page.reload();
+  await expect(page.locator('#inbox-list .task .text')).toHaveText(['oops', 'keep me']);
+  await expect(page.locator('#recycle-section')).toBeHidden();
 });

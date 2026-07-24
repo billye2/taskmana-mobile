@@ -189,6 +189,7 @@ function render() {
   renderToday(today);
   renderInbox();
   renderSomeday();
+  renderRecycle();
   renderFooter(today);
 }
 
@@ -343,6 +344,33 @@ function renderSomeday() {
       M.dropTask(state, task.id);
       await persistAndRender();
     }, { danger: true }));
+
+    row.append(body, actions);
+    listEl.appendChild(row);
+  }
+}
+
+function renderRecycle() {
+  const tasks = M.droppedTasks(state);
+  const listEl = $('recycle-list');
+  listEl.replaceChildren();
+  $('recycle-count').textContent = tasks.length ? String(tasks.length) : '';
+  $('recycle-section').style.display = tasks.length ? '' : 'none';
+
+  for (const task of tasks) {
+    const row = el('li', 'task');
+    const body = el('div', 'body');
+    body.appendChild(el('span', 'text', task.text));
+    const left = M.droppedDaysLeft(task);
+    body.appendChild(
+      el('span', 'expires', left === 0 ? 'expires today' : `expires in ${left} day${left === 1 ? '' : 's'}`)
+    );
+
+    const actions = el('div', 'actions');
+    actions.appendChild(actionBtn('Inbox', `Restore to inbox: ${task.text}`, async () => {
+      M.restoreDropped(state, task.id);
+      await persistAndRender();
+    }));
 
     row.append(body, actions);
     listEl.appendChild(row);

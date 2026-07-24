@@ -55,6 +55,8 @@ State lives in `chrome.storage.local` under the key `taskmana-state`. It survive
 
 The footer shows today's completed tasks, with a collapsed **Previous days** log beneath it — the last 14 days of finished tasks, grouped by day, like flipping back through a bullet journal. Completed tasks are never deleted; older days just aren't shown.
 
+Dropped tasks aren't gone immediately either: they sit in a collapsed **Recycle bin** section for 30 days (each row shows when it expires), where one click restores them to the Inbox. After 30 days the daily rollover prunes them for good.
+
 Use the **Export** button in the footer (or the nudge after finishing a weekly review) to download a dated JSON backup (`taskmana-backup-YYYY-MM-DD.json`), and **Import** to restore one — it validates the file and asks before replacing your current tasks.
 
 ## Development
@@ -66,8 +68,8 @@ Dev tooling (tests + types only):
 ```sh
 npm install
 npm run typecheck   # TypeScript strict mode over the JS source (checkJs + JSDoc)
-npm run test:unit   # node:test unit tests for model logic + sync merge (42 tests)
-npm run test:e2e    # Playwright: real extension + touch emulation; e2e + axe a11y + visual regression (23 tests)
+npm run test:unit   # node:test unit tests for model logic + sync merge (46 tests)
+npm run test:e2e    # Playwright: real extension + touch emulation; e2e + axe a11y + visual regression (24 tests)
 npm test            # all of the above
 ```
 
