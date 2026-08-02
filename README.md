@@ -4,7 +4,7 @@ A calm personal task system as an installable web app — mobile-first, offline-
 
 It combines four pen-and-paper systems. **More → Method hints** toggles in-app explanations of each method with its author, each with cyclable (`↻`) real-world examples. Hints start on with a mouse and off on a phone, where they'd otherwise be half the first screen.
 
-- **Brain dump** (David Allen, *Getting Things Done*) — the capture box at the top. Type, hit Enter, it's out of your head and into the Inbox.
+- **Brain dump** (David Allen, *Getting Things Done*) — the capture bar, always within thumb reach at the bottom. Type, hit Enter, it's out of your head and into the Inbox.
 - **Daily top-3 + ordered queue** (Ivy Lee Method, 1918) — Today holds up to 6 ordered tasks; the first 3 are visually "today's win." Toggle **Focus** to enforce Ivy Lee strictness: only the first unfinished task is actionable.
 - **Migration** (Ryder Carroll, Bullet Journal) — unfinished Today tasks carry over each day and earn a `›` mark. After 5 carries, the task asks you: *still worth doing?* Keep / Someday / Drop.
 - **Weekly review** (GTD) — the **Review** button walks through your inbox, someday list, and stale tasks one at a time (a red dot nudges you when it's been 7+ days). Finishing a review offers a one-click **Export backup** while the list is at its cleanest.
@@ -34,25 +34,15 @@ The repo is linked to the Vercel project `taskmana` and connected to GitHub, so 
 
 ## Sync (optional)
 
-Signed out, the app is local-only. With a Supabase project configured, the footer **Sync** button signs you in by email one-time code (no password, no redirect URLs) and keeps devices in step: local-first (every device renders from its own storage instantly and works offline), background pull/merge on open, debounced push on change with optimistic concurrency on a `revision` column. Conflicts are merged per task — the copy with the newer `modifiedAt` wins — so a capture on the phone can't be clobbered by a desktop save.
+Signed out, the app is local-only. With a Supabase project configured, **More → Backup & sync → Sync** signs you in by email one-time code (no password, no redirect URLs) and keeps devices in step: local-first (every device renders from its own storage instantly and works offline), background pull/merge on open, debounced push on change with optimistic concurrency on a `revision` column. Conflicts are merged per task — the copy with the newer `modifiedAt` wins — so a capture on the phone can't be clobbered by a desktop save.
 
-One-time Supabase setup:
+This project is already wired to a Supabase project — `js/config.js` holds its URL and anon key, and the table exists. To set it up again from scratch:
 
-1. Create a project, then in the SQL editor. The `taskmana_` prefix matters: this Supabase project hosts several apps, and a bare `states` table is a collision waiting to happen.
-   ```sql
-   create table public.taskmana_states (
-     user_id uuid primary key references auth.users (id) on delete cascade,
-     state jsonb not null,
-     revision bigint not null default 1,
-     updated_at timestamptz not null default now());
-   alter table public.taskmana_states enable row level security;
-   create policy "select own" on public.taskmana_states for select using (auth.uid() = user_id);
-   create policy "insert own" on public.taskmana_states for insert with check (auth.uid() = user_id);
-   create policy "update own" on public.taskmana_states for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
-   ```
-2. Auth → Email templates → **Magic Link**: include `{{ .Token }}` in the body (e.g. "Your Taskmana code: {{ .Token }}") so the email carries the 6-digit code.
-3. Copy the project URL and anon key into `js/config.js`. The anon key is publishable; RLS is the security boundary.
-Note that `auth.users` is shared across the whole Supabase project, so anyone signed up for another app in it can sign into Taskmana — RLS still scopes them to their own (empty) row. For the same reason, do **not** disable "Allow new users to sign up": it's a project-wide setting and would break signup for the other apps. Use an email allowlist in the RLS policies if you want to lock this one down.
+1. Run `scripts/supabase-setup.sql` in the SQL editor. It's idempotent. The `taskmana_` table prefix matters: the Supabase project hosts several apps, and a bare `states` table would be a collision waiting to happen — `js/sync.js` reads `from('taskmana_states')`.
+2. Auth → Email templates → **Magic Link**: include `{{ .Token }}` in the body (e.g. "Your Taskmana code: {{ .Token }}"). `js/sync.js` uses `verifyOtp` with a 6-digit code, not a redirect link, so without the token in the template there is nothing to verify against.
+3. Put the project URL and anon key in `js/config.js`. The anon key is publishable and committed on purpose; RLS is the security boundary.
+
+Two things the single-app version of these instructions gets wrong for a **shared** Supabase project. `auth.users` is project-wide, so anyone signed up for another app in it can sign into Taskmana — RLS still scopes them to their own empty row, so it's a nuisance rather than a breach. And do **not** disable "Allow new users to sign up" as a lockdown: it's a project-wide setting that would break signup for the other apps. Use an email allowlist in the RLS policies instead.
 
 Gotchas: Supabase free-tier projects pause after ~a week of inactivity (sync quietly stops; local keeps working; restore the project to resume). The vendored `js/vendor/supabase.js` is lazy-loaded only when a session exists or the Sync dialog opens, so a normal open doesn't pay its parse cost.
 
@@ -60,15 +50,17 @@ Gotchas: Supabase free-tier projects pause after ~a week of inactivity (sync qui
 
 State lives in `localStorage` under the key `taskmana-state`, and the app asks for persistent storage on boot. Installed as a home-screen app that's durable; in a plain iOS Safari tab it is not — iOS evicts unused tab storage after ~7 days. Install it, or configure sync, or both.
 
-The footer shows today's completed tasks, with a collapsed **Previous days** log beneath it — the last 14 days of finished tasks, grouped by day, like flipping back through a bullet journal. Completed tasks are never deleted; older days just aren't shown.
+The foot of **Today** shows what you finished today — the day's reward belongs on the day's screen. **More → Done** keeps a collapsed **Previous days** log: the last 14 days of finished tasks, grouped by day, like flipping back through a bullet journal. Completed tasks are never deleted; older days just aren't shown.
 
-Dropped tasks aren't gone immediately either: they sit in a collapsed **Recycle bin** section for 30 days (each row shows when it expires), where one click restores them to the Inbox. After 30 days the daily rollover prunes them for good.
+Dropped tasks aren't gone immediately either: they sit in **More → Recycle bin** for 30 days (each row shows when it expires), where one tap restores them to the Inbox. After 30 days the daily rollover prunes them for good.
 
-Use the **Export** button in the footer (or the nudge after finishing a weekly review) to download a dated JSON backup (`taskmana-backup-YYYY-MM-DD.json`), and **Import** to restore one — it validates the file and asks before replacing your current tasks. In an installed app Export goes through the system share sheet, because an `<a download>` click is unreliable in a standalone iOS PWA.
+Use **More → Backup & sync → Export backup** (or the nudge after finishing a weekly review) to download a dated JSON backup (`taskmana-backup-YYYY-MM-DD.json`), and **Import** to restore one — it validates the file and asks before replacing your current tasks. In an installed app Export goes through the system share sheet, because an `<a download>` click is unreliable in a standalone iOS PWA.
 
 ## Development
 
-No build step: the files in this folder are served as-is. The scripts are classic (non-module) scripts on purpose — top-level `const` namespaces (`TaskmanaStore`, `TaskmanaModel`, `TaskmanaSync`, `TaskmanaConfig`) are the cross-file sharing mechanism, and load order in `index.html` is therefore load-bearing.\n\n`npm run serve` starts a dependency-free static server on http://localhost:4173 (`scripts/serve.mjs`); Playwright starts the same one automatically.
+No build step: the files in this folder are served as-is. The scripts are classic (non-module) scripts on purpose — top-level `const` namespaces (`TaskmanaStore`, `TaskmanaModel`, `TaskmanaSync`, `TaskmanaConfig`, `TaskmanaNav`, `TaskmanaUI`, `TaskmanaViewport`, `TaskmanaSwipe`) are the cross-file sharing mechanism, and the load order in `index.html` is therefore load-bearing. Note those are global *lexical* bindings, not properties of `window` — `page.evaluate(() => TaskmanaNav...)` fails where `page.evaluate('TaskmanaNav...')` works.
+
+`npm run serve` starts a dependency-free static server on http://localhost:4173 (`scripts/serve.mjs`); Playwright starts the same one automatically.
 
 Dev tooling (tests + types only):
 
