@@ -44,7 +44,7 @@ for (const scheme of ['light', 'dark'] as const) {
 test('plan-tomorrow dialog visual', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await writeStateAndReload(page, seed);
-  await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await page.getByRole('button', { name: 'Add to tomorrow: Email accountant about Q3' }).click();
   await expect(page.locator('#plan-count')).toHaveText('1/6 picked');
   await expect(page).toHaveScreenshot('plan-dialog.png', {

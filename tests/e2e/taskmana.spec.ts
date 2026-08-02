@@ -37,7 +37,7 @@ test('promote to today, complete, reorder, and focus mode locking', async ({ pag
   await expect(page.locator('#today-list .task.locked .text')).toHaveText(['four', 'three']);
   const focused = page.locator('#today-list .task.focused');
   await expect(focused.locator('.text')).toHaveText('two');
-  await expect(focused.locator('.text')).toHaveCSS('font-size', '28px'); // 2x the 14px base
+  await expect(focused.locator('.text')).toHaveCSS('font-size', '30px'); // 2x the 15px base
   await page.getByRole('checkbox', { name: 'Mark done: two' }).check();
   await expect(page.locator('#today-list .task.focused .text')).toHaveText('four'); // focus advances
 });
@@ -49,7 +49,7 @@ test('plan tomorrow queue promotes in order at day rollover with migration marks
     .getByRole('button', { name: 'Add to today: carried' })
     .click();
 
-  await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
 
   // before any picks the preview already shows the carried-over task, marked
   // with the › it will earn at rollover
@@ -118,7 +118,6 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
   await page.locator('#review-close').click();
 
   await expect(page.locator('#review-badge')).toBeHidden();
-  await page.locator('#someday-section summary').click();
   await expect(page.locator('#someday-list .task .text')).toHaveText(['stale task']);
 });
 
@@ -154,11 +153,11 @@ test('previous-days history is collapsed under the footer and expands on demand'
 test('method hints name their authors and can be toggled off', async ({ page }) => {
   const hints = page.locator('.hint:not(.hint-example)');
   await expect(hints).toHaveCount(4); // Today, Inbox, Someday, Recycle bin
-  await expect(hints.nth(3)).toContainText('30 days');
-  await expect(hints.nth(0)).toContainText('Ivy Lee');
-  await expect(hints.nth(0)).toContainText('Ryder Carroll');
-  await expect(hints.nth(1)).toContainText('David Allen');
-  await page.getByRole('button', { name: 'Show or hide method hints' }).click();
+  await expect(page.locator('#today-section .hint').first()).toContainText('Ivy Lee');
+  await expect(page.locator('#today-section .hint').first()).toContainText('Ryder Carroll');
+  await expect(page.locator('#inbox-section .hint').first()).toContainText('David Allen');
+  await expect(page.locator('#recycle-section .hint')).toContainText('30 days');
+  await page.locator('#hints-toggle').click();
   await expect(hints.nth(0)).toBeHidden();
   await page.reload();
   await expect(page.locator('.hint').nth(0)).toBeHidden(); // persisted
@@ -178,12 +177,12 @@ test('hint examples cycle through and wrap around', async ({ page }) => {
   // every section has examples, and they hide with the hints toggle
   await expect(page.locator('.hint-example[data-section="inbox"] .example-text')).toContainText('(1/4)');
   await expect(page.locator('.hint-example[data-section="someday"] .example-text')).toContainText('(1/3)');
-  await page.getByRole('button', { name: 'Show or hide method hints' }).click();
+  await page.locator('#hints-toggle').click();
   await expect(todayExample).toBeHidden();
 });
 
 test('review and plan dialogs have cyclable examples that follow the hints toggle', async ({ page }) => {
-  await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   const planExample = page.locator('.hint-example[data-section="plan"] .example-text');
   await expect(planExample).toContainText('(1/4)');
   await page.getByRole('button', { name: 'Show another example for planning tomorrow' }).click();
@@ -198,8 +197,8 @@ test('review and plan dialogs have cyclable examples that follow the hints toggl
   await page.locator('#review-close').click();
 
   // hints off hides dialog examples too
-  await page.getByRole('button', { name: 'Show or hide method hints' }).click();
-  await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+  await page.locator('#hints-toggle').click();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(planExample).toBeHidden();
 });
 
@@ -220,8 +219,8 @@ test('export downloads a dated backup and import restores it', async ({ page }) 
   });
   await expect(page.locator('#inbox-list .task')).toHaveCount(0);
 
-  page.once('dialog', (d) => d.accept()); // confirm the replace prompt
   await page.locator('#import-file').setInputFiles(backupPath!);
+  await page.locator('#confirm-ok').click(); // in-app replace confirmation
   await expect(page.locator('#inbox-list .task .text')).toHaveText([
     'another keeper',
     'irreplaceable task',
@@ -235,56 +234,60 @@ test('export downloads a dated backup and import restores it', async ({ page }) 
 test('import rejects invalid files and cancel leaves data untouched', async ({ page }) => {
   await capture(page, 'safe task');
 
-  // not a Taskmana backup: alert, nothing changes
-  const alertPromise = page.waitForEvent('dialog');
+  // not a Taskmana backup: in-app toast, no confirmation offered, nothing changes
   await page.locator('#import-file').setInputFiles({
     name: 'junk.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{"hello":"world"}'),
   });
-  const alert = await alertPromise;
-  expect(alert.type()).toBe('alert');
-  await alert.accept();
+  await expect(page.locator('#toast')).toContainText('isn’t a Taskmana backup');
+  await expect(page.locator('#confirm-dialog')).toBeHidden();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
 
-  // valid backup but user cancels the confirm: nothing changes
+  // valid backup but the user cancels: nothing changes
   const empty = { tasks: [], lastRolloverDate: '2020-01-01', tomorrowQueue: [], lastReviewDate: null, settings: { focusMode: false } };
-  const confirmPromise = page.waitForEvent('dialog');
   await page.locator('#import-file').setInputFiles({
     name: 'empty.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(empty)),
   });
-  const confirm = await confirmPromise;
-  expect(confirm.type()).toBe('confirm');
-  await confirm.dismiss();
+  await expect(page.locator('#confirm-dialog')).toBeVisible();
+  await page.locator('#confirm-cancel').click();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['safe task']);
 });
 
-test('sync dialog opens signed-out with no network and explains unconfigured state', async ({ page }) => {
+test('sync dialog opens signed-out at the email step without touching the network', async ({
+  page,
+}) => {
   await page.locator('#sync-btn').click();
   const dialog = page.locator('#sync-dialog');
   await expect(dialog).toBeVisible();
-  // repo config ships empty → calm setup hint, no sign-in forms, no dot
-  await expect(page.locator('#sync-unconfigured')).toBeVisible();
-  await expect(page.locator('#sync-email-form')).toBeHidden();
+  // Supabase is configured, so the sign-in form is offered — but nothing is
+  // sent until the user submits, and signed out there is no status dot.
+  await expect(page.locator('#sync-unconfigured')).toBeHidden();
+  await expect(page.locator('#sync-email-form')).toBeVisible();
+  await expect(page.locator('#sync-code-form')).toBeHidden();
+  await expect(page.locator('#sync-signedin')).toBeHidden();
   await expect(page.locator('#sync-dot')).toBeHidden();
   await page.locator('#sync-close').click();
   await expect(dialog).toBeHidden();
 });
 
-test('theme toggle forces light and dark regardless of system scheme', async ({ page }) => {
+test('theme selector forces light and dark regardless of system scheme', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
-  const themeBtn = page.locator('#theme-toggle');
-  await expect(themeBtn).toHaveText('Auto');
-  await themeBtn.click(); // -> Light
-  await expect(themeBtn).toHaveText('Light');
+  const seg = (name: string) => page.locator(`#theme-select .seg[data-theme="${name}"]`);
+  await expect(seg('system')).toHaveClass(/active/);
+
+  await seg('light').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 250, 250)');
-  await themeBtn.click(); // -> Dark
+  await expect(seg('light')).toHaveAttribute('aria-pressed', 'true');
+
+  await seg('dark').click();
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
+
   await page.reload();
-  await expect(page.locator('#theme-toggle')).toHaveText('Dark'); // persisted
+  await expect(seg('dark')).toHaveClass(/active/); // persisted
 });
 
 test('dropped tasks land in the recycle bin and can be restored to the inbox', async ({ page }) => {

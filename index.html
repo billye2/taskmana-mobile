@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Taskmana</title>
   <link rel="stylesheet" href="css/style.css" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -13,151 +13,263 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Taskmana" />
   <!-- Draws under the status bar, which is what makes safe-area-inset-top
-       non-zero — paired with the .page top padding in the touch media block. -->
+       non-zero — paired with the .appbar top padding in the stylesheet. -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
 <body>
+  <header class="appbar">
+    <h1 id="date-line"></h1>
+    <!-- Every chip stays in the DOM; CSS shows the ones that belong to the
+         active view, and desktop shows them all at once. -->
+    <div class="appbar-actions">
+      <button id="focus-toggle" class="chip" title="Ivy Lee focus: work tasks strictly in order">Focus</button>
+      <button id="plan-btn" class="chip" title="End your day: choose tomorrow's tasks in order">Plan</button>
+      <button id="review-btn" class="chip" title="Weekly review: sort your inbox and stale tasks">Review<span id="review-badge" class="badge" hidden></span></button>
+    </div>
+  </header>
+
   <main class="page">
-    <header class="masthead">
-      <h1 id="date-line"></h1>
-      <div class="masthead-actions">
-        <button id="hints-toggle" class="chip" title="Show or hide method hints" aria-label="Show or hide method hints">?</button>
-        <button id="theme-toggle" class="chip" title="Theme: Auto follows your system appearance">Auto</button>
-        <button id="focus-toggle" class="chip" title="Ivy Lee focus: work tasks strictly in order">Focus</button>
-        <button id="review-btn" class="chip" title="Weekly review: sort your inbox and stale tasks">Review<span id="review-badge" class="badge" hidden></span></button>
-        <button id="plan-btn" class="chip" title="End your day: choose tomorrow's tasks in order">Plan tomorrow</button>
-      </div>
-    </header>
-
-    <form id="capture-form" class="capture" autocomplete="off">
-      <input id="capture-input" type="text" placeholder="What's on your mind? Get it out of your head…" aria-label="Capture a task" />
-    </form>
-
-    <section class="section" id="today-section">
+    <section class="view section" id="today-section" aria-labelledby="today-heading">
       <div class="section-head">
-        <h2>Today</h2>
+        <h2 id="today-heading">Today</h2>
         <span id="today-count" class="section-meta"></span>
       </div>
       <p class="hint"><strong>Ivy Lee Method</strong> (Ivy Lee, 1918) — up to 6 tasks in priority order; the top 3 are what would make today a win. <strong>Focus</strong> locks you to one task at a time, strictly in order. A <span class="migrations">›</span> means a task was carried over a day (<strong>Bullet Journal</strong> migration, Ryder Carroll) — after 5 carries it will ask if it&rsquo;s still worth doing.</p>
       <p class="hint hint-example" data-section="today"><button type="button" class="example-btn" aria-label="Show another example for Today" title="Show another example">↻</button><span class="example-text"></span></p>
       <p id="tomorrow-note" class="tomorrow-note" hidden></p>
-      <ul id="today-list" class="task-list"></ul>
+      <ul id="today-list" class="task-list" data-swipe="today"></ul>
       <p id="today-empty" class="empty-hint" hidden>Pick up to 6 tasks from your inbox. The first 3 are what would make today a win.</p>
+
+      <div class="done-block">
+        <button id="done-toggle" class="link-btn" hidden></button>
+        <ul id="done-list" class="task-list plain done-log" hidden></ul>
+      </div>
     </section>
 
-    <section class="section" id="inbox-section">
+    <section class="view section" id="inbox-section" aria-labelledby="inbox-heading">
       <div class="section-head">
-        <h2>Inbox</h2>
+        <h2 id="inbox-heading">Inbox</h2>
         <span id="inbox-count" class="section-meta"></span>
       </div>
       <p class="hint"><strong>Brain dump</strong> (David Allen, <em>Getting Things Done</em>) — capture everything here the moment it crosses your mind; your head is for having ideas, not holding them. Promote to Today deliberately, and sort the rest in the weekly <strong>Review</strong>.</p>
       <p class="hint hint-example" data-section="inbox"><button type="button" class="example-btn" aria-label="Show another example for the Inbox" title="Show another example">↻</button><span class="example-text"></span></p>
-      <ul id="inbox-list" class="task-list plain"></ul>
+      <ul id="inbox-list" class="task-list plain" data-swipe="inbox"></ul>
       <p id="inbox-empty" class="empty-hint" hidden>Empty. Nice — your head is clear.</p>
     </section>
 
-    <details class="section someday" id="someday-section">
-      <summary><h2>Someday</h2><span id="someday-count" class="section-meta"></span></summary>
+    <section class="view section" id="someday-section" aria-labelledby="someday-heading">
+      <div class="section-head">
+        <h2 id="someday-heading">Someday</h2>
+        <span id="someday-count" class="section-meta"></span>
+      </div>
       <p class="hint"><strong>Someday/Maybe</strong> (David Allen, <em>GTD</em>) — parked without guilt, not deleted. Resurfaces in the weekly Review so it stays a decision, not a graveyard.</p>
       <p class="hint hint-example" data-section="someday"><button type="button" class="example-btn" aria-label="Show another example for Someday" title="Show another example">↻</button><span class="example-text"></span></p>
-      <ul id="someday-list" class="task-list plain"></ul>
-    </details>
+      <ul id="someday-list" class="task-list plain" data-swipe="someday"></ul>
+      <p id="someday-empty" class="empty-hint" hidden>Nothing parked. Someday holds what matters but not now.</p>
+    </section>
 
-    <details class="section recycle" id="recycle-section">
-      <summary><h2>Recycle bin</h2><span id="recycle-count" class="section-meta"></span></summary>
-      <p class="hint">Dropped tasks wait here for 30 days before they&rsquo;re gone for good — restore anything you dropped by mistake.</p>
-      <ul id="recycle-list" class="task-list plain"></ul>
-    </details>
+    <section class="view" id="more-section" aria-labelledby="more-heading">
+      <div class="section-head">
+        <h2 id="more-heading">More</h2>
+      </div>
 
-    <footer class="footer">
-      <div class="footer-row">
-        <button id="done-toggle" class="link-btn" hidden></button>
-        <span class="footer-spacer"></span>
-        <button id="sync-btn" class="link-btn" title="Sync your tasks across devices"><span id="sync-dot" class="sync-dot" aria-hidden="true" hidden></span>Sync</button>
-        <button id="export-btn" class="link-btn" title="Download your tasks as a JSON backup file">Export</button>
-        <button id="import-btn" class="link-btn" title="Restore tasks from a JSON backup file">Import</button>
+      <div class="more-group">
+        <h3 class="more-title">Done</h3>
+        <details class="history" id="history-section" hidden>
+          <summary>Previous days</summary>
+          <div id="history-body"></div>
+        </details>
+        <p id="history-empty" class="empty-hint">Finished tasks from the last 14 days show up here.</p>
+      </div>
+
+      <details class="more-group section recycle" id="recycle-section">
+        <summary><h3 class="more-title">Recycle bin</h3><span id="recycle-count" class="section-meta"></span></summary>
+        <p class="hint">Dropped tasks wait here for 30 days before they&rsquo;re gone for good — restore anything you dropped by mistake.</p>
+        <ul id="recycle-list" class="task-list plain" data-swipe="recycle"></ul>
+      </details>
+
+      <div class="more-group">
+        <h3 class="more-title">Backup &amp; sync</h3>
+        <button id="sync-btn" class="more-row" title="Sync your tasks across devices">
+          <span class="more-row-label">Sync</span>
+          <span class="more-row-value"><span id="sync-dot" class="sync-dot" aria-hidden="true" hidden></span><span id="sync-summary">Signed out</span></span>
+        </button>
+        <button id="export-btn" class="more-row" title="Download your tasks as a JSON backup file">
+          <span class="more-row-label">Export backup</span>
+          <span class="more-row-value">JSON</span>
+        </button>
+        <button id="import-btn" class="more-row" title="Restore tasks from a JSON backup file">
+          <span class="more-row-label">Import backup</span>
+          <span class="more-row-value">JSON</span>
+        </button>
         <input id="import-file" type="file" accept="application/json,.json" hidden />
       </div>
-      <ul id="done-list" class="task-list plain done-log" hidden></ul>
-      <details class="history" id="history-section" hidden>
-        <summary>Previous days</summary>
-        <div id="history-body"></div>
-      </details>
-    </footer>
+
+      <div class="more-group">
+        <h3 class="more-title">Appearance</h3>
+        <div class="segmented" id="theme-select" role="group" aria-label="Theme">
+          <button type="button" class="seg" data-theme="system">Auto</button>
+          <button type="button" class="seg" data-theme="light">Light</button>
+          <button type="button" class="seg" data-theme="dark">Dark</button>
+        </div>
+      </div>
+
+      <div class="more-group">
+        <h3 class="more-title">Method hints</h3>
+        <button id="hints-toggle" class="more-row" title="Show or hide method hints" aria-pressed="true">
+          <span class="more-row-label">Show hints</span>
+          <span class="more-row-value" id="hints-state">On</span>
+        </button>
+        <p class="more-note">The short explanations under each section heading, with cyclable examples.</p>
+      </div>
+    </section>
   </main>
 
-  <dialog id="review-dialog" class="dialog" aria-labelledby="review-title">
-    <h2 id="review-title">Weekly review</h2>
-    <p class="dialog-sub">David Allen&rsquo;s GTD weekly review: one item at a time. Be honest — dropping something is a decision, not a failure.</p>
-    <p class="hint hint-example" data-section="review"><button type="button" class="example-btn" aria-label="Show another example for the weekly review" title="Show another example">↻</button><span class="example-text"></span></p>
-    <div id="review-card" class="review-card">
-      <p id="review-text" class="review-text"></p>
-      <p id="review-meta" class="review-meta"></p>
+  <!-- One fixed container owns both the capture bar and the tab bar, so they
+       can never drift apart or double-count the bottom safe-area inset. -->
+  <div class="bottom-dock">
+    <form id="capture-form" class="capture" autocomplete="off">
+      <input id="capture-input" type="text" placeholder="What's on your mind?" aria-label="Capture a task" />
+    </form>
+    <!-- Not role="tab": the ARIA tabs pattern mandates roving tabindex and
+         arrow-key navigation, which is not what anyone expects from a bottom
+         bar. aria-current is the honest description. -->
+    <nav class="tabbar" aria-label="Sections">
+      <button type="button" class="tab" data-view="today"><span class="tab-label">Today</span><span class="tab-count" id="tab-count-today"></span></button>
+      <button type="button" class="tab" data-view="inbox"><span class="tab-label">Inbox</span><span class="tab-count" id="tab-count-inbox"></span><span class="tab-dot" id="tab-dot-inbox" hidden></span></button>
+      <button type="button" class="tab" data-view="someday"><span class="tab-label">Someday</span><span class="tab-count" id="tab-count-someday"></span></button>
+      <button type="button" class="tab" data-view="more"><span class="tab-label">More</span></button>
+    </nav>
+  </div>
+
+  <dialog id="review-dialog" class="dialog sheet" aria-labelledby="review-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <h2 id="review-title">Weekly review</h2>
+      <button type="button" class="sheet-close" data-close aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body">
+      <p class="dialog-sub">David Allen&rsquo;s GTD weekly review: one item at a time. Be honest — dropping something is a decision, not a failure.</p>
+      <p class="hint hint-example" data-section="review"><button type="button" class="example-btn" aria-label="Show another example for the weekly review" title="Show another example">↻</button><span class="example-text"></span></p>
+      <div id="review-card" class="review-card">
+        <p id="review-text" class="review-text"></p>
+        <p id="review-meta" class="review-meta"></p>
+      </div>
+      <div class="dialog-actions" id="review-actions">
+        <button data-act="today" class="btn">Today</button>
+        <button data-act="keep" class="btn">This week</button>
+        <button data-act="someday" class="btn">Someday</button>
+        <button data-act="drop" class="btn danger">Drop</button>
+      </div>
+      <div class="dialog-actions" id="review-done-actions" hidden>
+        <button id="review-export" class="btn" title="Download your freshly reviewed tasks as a JSON backup">Export backup</button>
+      </div>
     </div>
-    <div class="dialog-actions" id="review-actions">
-      <button data-act="today" class="btn">Today</button>
-      <button data-act="keep" class="btn">This week</button>
-      <button data-act="someday" class="btn">Someday</button>
-      <button data-act="drop" class="btn danger">Drop</button>
-    </div>
-    <div class="dialog-actions" id="review-done-actions" hidden>
-      <button id="review-export" class="btn" title="Download your freshly reviewed tasks as a JSON backup">Export backup</button>
-    </div>
-    <div class="dialog-foot">
+    <footer class="sheet-foot">
       <span id="review-progress" class="section-meta"></span>
       <button id="review-close" class="link-btn">Close</button>
-    </div>
+    </footer>
   </dialog>
 
-  <dialog id="plan-dialog" class="dialog" aria-labelledby="plan-title">
-    <h2 id="plan-title">Plan tomorrow</h2>
-    <p class="dialog-sub">Ivy Lee&rsquo;s evening ritual: pick up to 6 tasks in the order you&rsquo;ll work them tomorrow. Click to add, click again to remove.</p>
-    <p class="hint hint-example" data-section="plan"><button type="button" class="example-btn" aria-label="Show another example for planning tomorrow" title="Show another example">↻</button><span class="example-text"></span></p>
-    <ul id="plan-list" class="task-list plain plan-list"></ul>
-    <p id="plan-empty" class="empty-hint" hidden>Nothing to plan from — capture some tasks first.</p>
-    <div id="plan-preview" class="plan-preview" hidden>
-      <h3 id="plan-preview-title" class="preview-title">Tomorrow&rsquo;s list</h3>
-      <ol id="plan-preview-list" class="preview-list" aria-labelledby="plan-preview-title"></ol>
-      <p id="plan-preview-overflow" class="preview-overflow" hidden></p>
+  <dialog id="plan-dialog" class="dialog sheet" aria-labelledby="plan-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <h2 id="plan-title">Plan tomorrow</h2>
+      <button type="button" class="sheet-close" data-close aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body">
+      <p class="dialog-sub">Ivy Lee&rsquo;s evening ritual: pick up to 6 tasks in the order you&rsquo;ll work them tomorrow. Tap to add, tap again to remove.</p>
+      <p class="hint hint-example" data-section="plan"><button type="button" class="example-btn" aria-label="Show another example for planning tomorrow" title="Show another example">↻</button><span class="example-text"></span></p>
+      <ul id="plan-list" class="task-list plain plan-list"></ul>
+      <p id="plan-empty" class="empty-hint" hidden>Nothing to plan from — capture some tasks first.</p>
+      <div id="plan-preview" class="plan-preview" hidden>
+        <h3 id="plan-preview-title" class="preview-title">Tomorrow&rsquo;s list</h3>
+        <ol id="plan-preview-list" class="preview-list" aria-labelledby="plan-preview-title"></ol>
+        <p id="plan-preview-overflow" class="preview-overflow" hidden></p>
+      </div>
     </div>
-    <div class="dialog-foot">
+    <footer class="sheet-foot">
       <span id="plan-count" class="section-meta"></span>
-      <span>
+      <span class="sheet-foot-actions">
         <button id="plan-cancel" class="link-btn">Cancel</button>
         <button id="plan-save" class="btn">Save plan</button>
       </span>
+    </footer>
+  </dialog>
+
+  <dialog id="sync-dialog" class="dialog sheet" aria-labelledby="sync-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <h2 id="sync-title">Sync</h2>
+      <button type="button" class="sheet-close" data-close aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body">
+      <p class="dialog-sub">Keep the same list on every device. Sign in with your email — a one-time code, no password.</p>
+      <p id="sync-unconfigured" class="empty-hint" hidden>Sync isn&rsquo;t set up yet: add your Supabase URL and anon key to <code>js/config.js</code>.</p>
+      <form id="sync-email-form" class="sync-form" hidden>
+        <label class="sync-label" for="sync-email">Email</label>
+        <input id="sync-email" type="email" required placeholder="you@example.com" autocomplete="email" />
+        <button type="submit" class="btn">Send code</button>
+      </form>
+      <form id="sync-code-form" class="sync-form" hidden>
+        <label class="sync-label" for="sync-code">Enter the 6-digit code from your email</label>
+        <input id="sync-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
+        <button type="submit" class="btn">Verify</button>
+      </form>
+      <div id="sync-signedin" hidden>
+        <p id="sync-account" class="sync-account"></p>
+        <button id="sync-signout" class="link-btn">Sign out</button>
+      </div>
+      <p id="sync-error" class="sync-error" role="alert" hidden></p>
+    </div>
+    <footer class="sheet-foot">
+      <span id="sync-status" class="section-meta"></span>
+      <button id="sync-close" class="link-btn">Close</button>
+    </footer>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="dialog sheet confirm" aria-labelledby="confirm-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <div class="sheet-body">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-body" class="dialog-sub"></p>
+    </div>
+    <footer class="sheet-foot">
+      <span></span>
+      <span class="sheet-foot-actions">
+        <button id="confirm-cancel" class="btn" value="cancel">Cancel</button>
+        <button id="confirm-ok" class="btn" value="confirm"></button>
+      </span>
+    </footer>
+  </dialog>
+
+  <!-- Per-row actions on touch, where the inline button row would leave the
+       task text about 40% of the screen. Also the non-gestural path: every
+       swipe action appears here as a plain button. -->
+  <dialog id="row-actions-dialog" class="dialog sheet row-actions" aria-labelledby="row-actions-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head">
+      <h2 id="row-actions-title"></h2>
+      <button type="button" class="sheet-close" data-close aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body">
+      <div id="row-actions-list" class="sheet-action-list"></div>
     </div>
   </dialog>
 
-  <dialog id="sync-dialog" class="dialog" aria-labelledby="sync-title">
-    <h2 id="sync-title">Sync</h2>
-    <p class="dialog-sub">Keep the same list on every device. Sign in with your email — a one-time code, no password.</p>
-    <p id="sync-unconfigured" class="empty-hint" hidden>Sync isn&rsquo;t set up yet: add your Supabase URL and anon key to <code>js/config.js</code>.</p>
-    <form id="sync-email-form" class="sync-form" hidden>
-      <label class="sync-label" for="sync-email">Email</label>
-      <input id="sync-email" type="email" required placeholder="you@example.com" autocomplete="email" />
-      <button type="submit" class="btn">Send code</button>
-    </form>
-    <form id="sync-code-form" class="sync-form" hidden>
-      <label class="sync-label" for="sync-code">Enter the 6-digit code from your email</label>
-      <input id="sync-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
-      <button type="submit" class="btn">Verify</button>
-    </form>
-    <div id="sync-signedin" hidden>
-      <p id="sync-account" class="sync-account"></p>
-      <button id="sync-signout" class="link-btn">Sign out</button>
-    </div>
-    <p id="sync-error" class="sync-error" role="alert" hidden></p>
-    <div class="dialog-foot">
-      <span id="sync-status" class="section-meta"></span>
-      <button id="sync-close" class="link-btn">Close</button>
-    </div>
-  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span class="toast-text"></span>
+    <button type="button" class="toast-action" hidden></button>
+  </div>
 
   <script src="js/store.js"></script>
   <script src="js/model.js"></script>
   <script src="js/config.js"></script>
   <script src="js/sync.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/viewport.js"></script>
+  <script src="js/swipe.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -2,6 +2,14 @@ import AxeBuilder from '@axe-core/playwright';
 import { test, expect, capture, writeStateAndReload, localDate } from './fixtures';
 
 async function expectNoViolations(page: import('@playwright/test').Page) {
+  // Park the pointer off every row and let the fade settle first. A re-render
+  // can leave the mouse hovering a different row than it clicked, and axe
+  // sampling a half-faded action button reports a contrast violation that
+  // lasts 100ms and means nothing.
+  await page.mouse.move(0, 0);
+  const actions = page.locator('.task .actions').first();
+  if (await actions.count()) await expect(actions).toHaveCSS('opacity', /^[01]$/);
+
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
@@ -29,7 +37,7 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
 
   test('plan-tomorrow dialog', async ({ page }) => {
     await capture(page, 'plannable');
-    await page.getByRole('button', { name: 'Plan tomorrow' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expectNoViolations(page);
   });
 

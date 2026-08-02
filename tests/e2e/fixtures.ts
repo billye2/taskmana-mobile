@@ -23,6 +23,32 @@ export async function capture(page: import('@playwright/test').Page, text: strin
   await expect(page.locator('#inbox-list .task .text').first()).toHaveText(text);
 }
 
+/**
+ * Invoke a row action by its accessible name, whichever surface is showing.
+ *
+ * Desktop renders the inline button row; touch hides it and puts the same
+ * actions behind a per-row `⋯` sheet. Both use the identical accessible name
+ * (they're built from one descriptor list), so tests can be written once.
+ */
+export async function rowAction(
+  page: import('@playwright/test').Page,
+  listId: string,
+  taskText: string,
+  actionName: string
+) {
+  const row = page.locator(`#${listId} .task`, { hasText: taskText });
+  const inline = row.getByRole('button', { name: actionName });
+  if (await inline.isVisible()) {
+    await inline.click();
+    return;
+  }
+  await row.locator('.row-more').click();
+  const sheet = page.locator('#row-actions-dialog');
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: actionName }).click();
+  await expect(sheet).toBeHidden();
+}
+
 /** Read the persisted state straight from localStorage. */
 export function readState(page: import('@playwright/test').Page): Promise<any> {
   return page.evaluate((k) => {

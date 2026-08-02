@@ -146,6 +146,9 @@ const coarsePointer = matchMedia('(hover: none)').matches;
 function editableText(task) {
   const span = el('span', 'text', task.text);
   const startEdit = () => {
+    // A finger that drifted a few px on the way to a swipe must not also open
+    // the editor. TaskmanaSwipe reports that window.
+    if (TaskmanaSwipe.isSwallowing()) return;
     const input = el('input', 'edit-input');
     input.value = task.text;
     input.setAttribute('aria-label', 'Edit task');
@@ -167,6 +170,221 @@ function editableText(task) {
   return span;
 }
 
+// ---- row actions ------------------------------------------------------------
+
+// One description of what can be done to a task, consumed by three surfaces:
+// the inline button row (desktop), the per-row overflow sheet (touch), and the
+// swipe gestures. Kept in one place so they can't drift apart — and so "every
+// swipe also exists as a button" is true by construction rather than by
+// discipline.
+
+/**
+ * @typedef {object} RowAction
+ * @property {string} label            short text for the inline button
+ * @property {string} title            full accessible name
+ * @property {() => void} run
+ * @property {() => void} [undo]       makes a destructive action safe
+ * @property {string} [undoneMessage]  toast shown after run(), with Undo
+ * @property {boolean} [danger]
+ * @property {boolean} [disabled]
+ * @property {'left' | 'right'} [swipe]
+ * @property {string} [swipeLabel]     wording on the revealed swipe background
+ */
+
+/**
+ * @param {Task} task
+ * @param {'today' | 'inbox' | 'someday' | 'recycle'} kind
+ * @param {{idx?: number, count?: number, room?: boolean, today?: string}} ctx
+ * @returns {RowAction[]}
+ */
+function rowActions(task, kind, ctx) {
+  const { idx = 0, count = 0, room = false, today = M.todayStr() } = ctx;
+
+  /** @type {RowAction} */
+  const drop = {
+    label: '✕',
+    title: `Drop: ${task.text}`,
+    danger: true,
+    swipe: 'left',
+    swipeLabel: 'Drop',
+    undoneMessage: 'Dropped',
+    run: () => M.dropTask(state, task.id),
+    undo: () => M.restoreDropped(state, task.id),
+  };
+
+  if (kind === 'today') {
+    /** @type {RowAction[]} */
+    const list = [
+      {
+        label: '↑',
+        title: `Move up: ${task.text}`,
+        disabled: idx === 0,
+        run: () => M.moveInToday(state, task.id, -1),
+      },
+      {
+        label: '↓',
+        title: `Move down: ${task.text}`,
+        disabled: idx === count - 1,
+        run: () => M.moveInToday(state, task.id, 1),
+      },
+    ];
+    if (task.status !== 'done') {
+      list.push({
+        label: 'Inbox',
+        title: `Send back to inbox: ${task.text}`,
+        swipe: 'left',
+        swipeLabel: 'To inbox',
+        undoneMessage: 'Moved to Inbox',
+        run: () => M.demoteToInbox(state, task.id),
+        undo: () => M.promoteToToday(state, task.id),
+      });
+    }
+    // Swiping right completes, mirroring the checkbox.
+    list.unshift({
+      label: task.status === 'done' ? 'Undo' : 'Done',
+      title: task.status === 'done' ? `Mark not done: ${task.text}` : `Mark done: ${task.text}`,
+      swipe: 'right',
+      swipeLabel: task.status === 'done' ? 'Undo' : '✓ Done',
+      run: () => M.toggleDone(state, task.id, today),
+    });
+    return list;
+  }
+
+  if (kind === 'inbox') {
+    return [
+      {
+        label: 'Today',
+        title: room ? `Add to today: ${task.text}` : 'Today is full (6 max)',
+        disabled: !room,
+        swipe: 'right',
+        swipeLabel: 'To today',
+        undoneMessage: 'Added to Today',
+        run: () => M.promoteToToday(state, task.id),
+        undo: () => M.demoteToInbox(state, task.id),
+      },
+      {
+        label: 'Someday',
+        title: `Park in Someday: ${task.text}`,
+        undoneMessage: 'Parked in Someday',
+        run: () => M.sendToSomeday(state, task.id),
+        undo: () => M.demoteToInbox(state, task.id),
+      },
+      drop,
+    ];
+  }
+
+  if (kind === 'someday') {
+    return [
+      {
+        label: 'Inbox',
+        title: `Move back to inbox: ${task.text}`,
+        swipe: 'right',
+        swipeLabel: 'To inbox',
+        undoneMessage: 'Moved to Inbox',
+        run: () => M.demoteToInbox(state, task.id),
+        undo: () => M.sendToSomeday(state, task.id),
+      },
+      drop,
+    ];
+  }
+
+  // recycle: restore only. model.js has no permanent delete, and the 30-day
+  // prune is the daily rollover's job.
+  return [
+    {
+      label: 'Inbox',
+      title: `Restore to inbox: ${task.text}`,
+      swipe: 'right',
+      swipeLabel: 'Restore',
+      run: () => M.restoreDropped(state, task.id),
+    },
+  ];
+}
+
+/** Run an action, persist, and offer Undo when it has an inverse. */
+/** @param {RowAction} action */
+async function runAction(action) {
+  if (action.disabled) {
+    TaskmanaUI.toast(action.title);
+    return;
+  }
+  action.run();
+  await persistAndRender();
+  if (action.undoneMessage && action.undo) {
+    const undo = action.undo;
+    TaskmanaUI.toast(action.undoneMessage, {
+      action: 'Undo',
+      onAction: async () => {
+        undo();
+        await persistAndRender();
+      },
+    });
+  }
+}
+
+/**
+ * Build a task row: swipe background, then the foreground that slides over it.
+ * @param {Task} task
+ * @param {'today' | 'inbox' | 'someday' | 'recycle'} kind
+ * @param {{idx?: number, count?: number, room?: boolean, today?: string}} [ctx]
+ * @returns {{row: HTMLLIElement, fg: HTMLElement, body: HTMLElement,
+ *            actions: RowAction[], actionsEl: HTMLElement, overflow: HTMLElement}}
+ */
+function taskRow(task, kind, ctx = {}) {
+  const actions = rowActions(task, kind, ctx);
+  const row = el('li', 'task');
+  row.dataset.id = task.id;
+
+  const lead = actions.find((a) => a.swipe === 'right');
+  const trail = actions.find((a) => a.swipe === 'left');
+  if (lead || trail) {
+    const bg = el('div', 'swipe-bg');
+    bg.setAttribute('aria-hidden', 'true');
+    bg.append(
+      el('span', 'bg-lead' + (lead?.danger ? ' danger' : ''), lead?.swipeLabel ?? ''),
+      el('span', 'bg-trail' + (trail?.danger ? ' danger' : ''), trail?.swipeLabel ?? '')
+    );
+    row.appendChild(bg);
+  }
+
+  const fg = el('div', 'swipe-fg');
+  const body = el('div', 'body');
+  row.appendChild(fg);
+
+  // Inline buttons: the desktop surface, and the a11y fallback everywhere.
+  const actionsEl = el('div', 'actions');
+  for (const a of actions) {
+    actionsEl.appendChild(
+      actionBtn(a.label, a.title, () => runAction(a), { danger: a.danger, disabled: a.disabled })
+    );
+  }
+
+  // On touch the inline row would leave ~40% of a 390pt screen for the task
+  // text, so the same actions move behind a single overflow button.
+  const overflow = actionBtn('⋯', `Actions for: ${task.text}`, () => openRowActions(task, actions));
+  overflow.classList.add('row-more');
+
+  return { row, fg, body, actions, actionsEl, overflow };
+}
+
+/** @param {Task} task @param {RowAction[]} actions */
+function openRowActions(task, actions) {
+  $('row-actions-title').textContent = task.text;
+  const listEl = $('row-actions-list');
+  listEl.replaceChildren();
+  for (const a of actions) {
+    const btn = el('button', 'sheet-action' + (a.danger ? ' danger' : ''), a.title);
+    btn.type = 'button';
+    btn.disabled = !!a.disabled;
+    btn.addEventListener('click', async () => {
+      $dialog('row-actions-dialog').close();
+      await runAction(a);
+    });
+    listEl.appendChild(btn);
+  }
+  $dialog('row-actions-dialog').showModal();
+}
+
 /** @param {string} dateStr @param {string} today */
 function historyDayLabel(dateStr, today) {
   // new Date('YYYY-MM-DD') parses as UTC midnight and renders the previous
@@ -185,16 +403,18 @@ function historyDayLabel(dateStr, today) {
 
 function render() {
   const today = M.todayStr();
-  renderMasthead(today);
+  renderAppbar(today);
   renderToday(today);
   renderInbox();
   renderSomeday();
   renderRecycle();
-  renderFooter(today);
+  renderDone(today);
+  renderSettings();
+  renderTabs(today);
 }
 
 /** @param {string} today */
-function renderMasthead(today) {
+function renderAppbar(today) {
   $('date-line').textContent = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
     month: 'long',
@@ -202,12 +422,44 @@ function renderMasthead(today) {
   });
   $('focus-toggle').classList.toggle('active', state.settings.focusMode);
   $('review-badge').hidden = !M.reviewDue(state, today);
+}
+
+/** Theme + hints, which live on the More screen. */
+function renderSettings() {
   const theme = state.settings.theme ?? 'system';
-  $('theme-toggle').textContent = THEME_LABELS[theme];
-  $('theme-toggle').classList.toggle('active', theme !== 'system');
+  for (const node of $('theme-select').querySelectorAll('.seg')) {
+    const btn = /** @type {HTMLButtonElement} */ (node);
+    const on = btn.dataset.theme === theme;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    const key = /** @type {ThemeName} */ (btn.dataset.theme ?? 'system');
+    btn.setAttribute('aria-label', `Theme: ${THEME_LABELS[key]}`);
+  }
+
   const hints = state.settings.showHints ?? true;
-  $('hints-toggle').classList.toggle('active', hints);
+  $('hints-toggle').setAttribute('aria-pressed', String(hints));
+  $('hints-state').textContent = hints ? 'On' : 'Off';
   document.body.classList.toggle('hints-off', !hints);
+}
+
+/** @param {string} today */
+function renderTabs(today) {
+  const inbox = M.inboxTasks(state).length;
+  const someday = M.somedayTasks(state).length;
+  $('tab-count-today').textContent = String(M.todayList(state).length);
+  $('tab-count-inbox').textContent = inbox ? String(inbox) : '';
+  $('tab-count-someday').textContent = someday ? String(someday) : '';
+  // Mirror the review nudge onto the tab so it's visible from any view.
+  $('tab-dot-inbox').hidden = !M.reviewDue(state, today);
+
+  const view = TaskmanaNav.current();
+  for (const node of document.querySelectorAll('.tab')) {
+    const btn = /** @type {HTMLButtonElement} */ (node);
+    const on = btn.dataset.view === view;
+    btn.classList.toggle('active', on);
+    if (on) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
+  }
 }
 
 /** @param {string} today */
@@ -229,7 +481,11 @@ function renderToday(today) {
       listEl.appendChild(el('li', 'bonus-divider', 'bonus'));
     }
 
-    const row = el('li', 'task');
+    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'today', {
+      idx,
+      count: list.length,
+      today,
+    });
     if (idx < M.TOP_COUNT) row.classList.add('top');
     if (task.status === 'done') row.classList.add('done-row');
     if (state.settings.focusMode && task.status === 'today') {
@@ -244,8 +500,10 @@ function renderToday(today) {
       M.toggleDone(state, task.id, today);
       await persistAndRender();
     });
+    // The box stays visually small; the label around it is the 44px tap target.
+    const checkWrap = el('label', 'check-wrap');
+    checkWrap.appendChild(check);
 
-    const body = el('div', 'body');
     body.appendChild(editableText(task));
     const marks = migrationMarks(task);
     if (marks) body.appendChild(marks);
@@ -268,23 +526,7 @@ function renderToday(today) {
       body.appendChild(prompt);
     }
 
-    const actions = el('div', 'actions');
-    actions.appendChild(actionBtn('↑', `Move up: ${task.text}`, async () => {
-      M.moveInToday(state, task.id, -1);
-      await persistAndRender();
-    }, { disabled: idx === 0 }));
-    actions.appendChild(actionBtn('↓', `Move down: ${task.text}`, async () => {
-      M.moveInToday(state, task.id, 1);
-      await persistAndRender();
-    }, { disabled: idx === list.length - 1 }));
-    if (task.status !== 'done') {
-      actions.appendChild(actionBtn('Inbox', `Send back to inbox: ${task.text}`, async () => {
-        M.demoteToInbox(state, task.id);
-        await persistAndRender();
-      }));
-    }
-
-    row.append(check, body, actions);
+    fg.append(checkWrap, body, actionsEl, overflow);
     listEl.appendChild(row);
   });
 }
@@ -298,27 +540,11 @@ function renderInbox() {
   const room = M.todayHasRoom(state);
 
   for (const task of tasks) {
-    const row = el('li', 'task');
-    const body = el('div', 'body');
+    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'inbox', { room });
     body.appendChild(editableText(task));
     const marks = migrationMarks(task);
     if (marks) body.appendChild(marks);
-
-    const actions = el('div', 'actions');
-    actions.appendChild(actionBtn('Today', room ? `Add to today: ${task.text}` : 'Today is full (6 max)', async () => {
-      M.promoteToToday(state, task.id);
-      await persistAndRender();
-    }, { disabled: !room }));
-    actions.appendChild(actionBtn('Someday', `Park in Someday: ${task.text}`, async () => {
-      M.sendToSomeday(state, task.id);
-      await persistAndRender();
-    }));
-    actions.appendChild(actionBtn('✕', `Drop: ${task.text}`, async () => {
-      M.dropTask(state, task.id);
-      await persistAndRender();
-    }, { danger: true }));
-
-    row.append(body, actions);
+    fg.append(body, actionsEl, overflow);
     listEl.appendChild(row);
   }
 }
@@ -328,24 +554,14 @@ function renderSomeday() {
   const listEl = $('someday-list');
   listEl.replaceChildren();
   $('someday-count').textContent = tasks.length ? String(tasks.length) : '';
-  $('someday-section').style.display = tasks.length ? '' : 'none';
+  // Never hide the section itself: it is a whole view now, and an inline
+  // style.display would beat the body[data-view] rule and blank the tab.
+  $('someday-empty').hidden = tasks.length > 0;
 
   for (const task of tasks) {
-    const row = el('li', 'task');
-    const body = el('div', 'body');
+    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'someday', {});
     body.appendChild(editableText(task));
-
-    const actions = el('div', 'actions');
-    actions.appendChild(actionBtn('Inbox', `Move back to inbox: ${task.text}`, async () => {
-      M.demoteToInbox(state, task.id);
-      await persistAndRender();
-    }));
-    actions.appendChild(actionBtn('✕', `Drop: ${task.text}`, async () => {
-      M.dropTask(state, task.id);
-      await persistAndRender();
-    }, { danger: true }));
-
-    row.append(body, actions);
+    fg.append(body, actionsEl, overflow);
     listEl.appendChild(row);
   }
 }
@@ -355,30 +571,23 @@ function renderRecycle() {
   const listEl = $('recycle-list');
   listEl.replaceChildren();
   $('recycle-count').textContent = tasks.length ? String(tasks.length) : '';
-  $('recycle-section').style.display = tasks.length ? '' : 'none';
+  $('recycle-section').hidden = tasks.length === 0;
 
   for (const task of tasks) {
-    const row = el('li', 'task');
-    const body = el('div', 'body');
+    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'recycle', {});
     body.appendChild(el('span', 'text', task.text));
     const left = M.droppedDaysLeft(task);
     body.appendChild(
       el('span', 'expires', left === 0 ? 'expires today' : `expires in ${left} day${left === 1 ? '' : 's'}`)
     );
-
-    const actions = el('div', 'actions');
-    actions.appendChild(actionBtn('Inbox', `Restore to inbox: ${task.text}`, async () => {
-      M.restoreDropped(state, task.id);
-      await persistAndRender();
-    }));
-
-    row.append(body, actions);
+    fg.append(body, actionsEl, overflow);
     listEl.appendChild(row);
   }
 }
 
+/** Done-today lives at the foot of Today; the day log lives under More. */
 /** @param {string} today */
-function renderFooter(today) {
+function renderDone(today) {
   const done = M.doneToday(state, today);
   const toggle = $('done-toggle');
   const listEl = $('done-list');
@@ -397,6 +606,7 @@ function renderFooter(today) {
   // reset its open state on every persistAndRender.
   const history = M.doneHistory(state, today);
   $('history-section').hidden = history.length === 0;
+  $('history-empty').hidden = history.length > 0;
   const body = $('history-body');
   body.replaceChildren();
   for (const day of history) {
@@ -416,9 +626,25 @@ function renderFooter(today) {
 $('capture-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = $input('capture-input');
-  if (M.addTask(state, input.value)) {
+  const text = input.value.trim();
+  if (M.addTask(state, text)) {
     input.value = '';
     await persistAndRender();
+    // addTask always files to the Inbox, so from any other view the capture
+    // looks like it did nothing. Say where it went, and offer the shortcut.
+    if (TaskmanaNav.current() !== 'inbox') {
+      const task = M.inboxTasks(state).find((t) => t.text === text);
+      const canPromote = !!task && M.todayHasRoom(state);
+      TaskmanaUI.toast('Added to Inbox', {
+        action: canPromote ? 'Add to Today' : undefined,
+        onAction: canPromote
+          ? async () => {
+              M.promoteToToday(state, /** @type {Task} */ (task).id);
+              await persistAndRender();
+            }
+          : undefined,
+      });
+    }
   }
   input.focus();
 });
@@ -428,17 +654,33 @@ $('focus-toggle').addEventListener('click', async () => {
   await persistAndRender();
 });
 
-$('theme-toggle').addEventListener('click', async () => {
-  const cur = state.settings.theme ?? 'system';
-  const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
-  state.settings.theme = next;
-  applyTheme(next);
+// A segmented control rather than the old cycling chip: on touch you can't
+// discover the options of a cycler without tapping through them.
+$('theme-select').addEventListener('click', async (e) => {
+  const seg = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (e.target).closest('.seg')
+  );
+  const theme = seg?.dataset.theme;
+  if (!theme || !THEMES.includes(/** @type {ThemeName} */ (theme))) return;
+  state.settings.theme = /** @type {ThemeName} */ (theme);
+  applyTheme(theme);
   await persistAndRender();
 });
 
 $('hints-toggle').addEventListener('click', async () => {
   state.settings.showHints = !(state.settings.showHints ?? true);
   await persistAndRender();
+});
+
+// ---- view routing -----------------------------------------------------------
+
+// Delegated: one listener on the bar rather than four on buttons.
+document.querySelector('.tabbar')?.addEventListener('click', (e) => {
+  const tab = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (e.target).closest('.tab')
+  );
+  const view = tab?.dataset.view;
+  if (view) TaskmanaNav.go(view);
 });
 
 $('done-toggle').addEventListener('click', () => {
@@ -501,18 +743,22 @@ $input('import-file').addEventListener('change', async () => {
   try {
     parsed = JSON.parse(await file.text());
   } catch {
-    alert('That file is not valid JSON.');
+    TaskmanaUI.toast('That file isn’t valid JSON.');
     return;
   }
   if (!M.isValidState(parsed)) {
-    alert('That file is not a Taskmana backup.');
+    TaskmanaUI.toast('That file isn’t a Taskmana backup.');
     return;
   }
   const current = state.tasks.length;
   const incoming = parsed.tasks.length;
-  if (!confirm(`Replace your current ${current} task${current === 1 ? '' : 's'} with the backup's ${incoming}?`)) {
-    return;
-  }
+  const ok = await TaskmanaUI.confirmSheet({
+    title: 'Replace everything?',
+    body: `This swaps your current ${current} task${current === 1 ? '' : 's'} for the backup’s ${incoming}. There's no undo.`,
+    confirmLabel: 'Replace',
+    danger: true,
+  });
+  if (!ok) return;
   state = /** @type {State} */ (M.migrateState(parsed));
   // The backup may be from an earlier day — run the normal morning rollover.
   M.rollover(state, M.todayStr());
@@ -714,6 +960,13 @@ function renderSync() {
   $('sync-signedin').hidden = !configured || !signedIn;
   if (signedIn) $('sync-account').textContent = `Signed in as ${TaskmanaSync.account()}`;
   $('sync-status').textContent = SYNC_STATUS_LABELS[status] ?? '';
+
+  // The More row carries the state in words; the dot alone was too quiet.
+  $('sync-summary').textContent = !configured
+    ? 'Not set up'
+    : signedIn
+      ? SYNC_STATUS_LABELS[status] || 'Signed in'
+      : 'Signed out';
 }
 
 /** @param {unknown} err */
@@ -764,11 +1017,39 @@ $('sync-close').addEventListener('click', () => $dialog('sync-dialog').close());
 
 // ---- boot -------------------------------------------------------------------
 
+const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+
 async function init() {
   state = M.migrateState(await store.load()) ?? M.initialState(M.todayStr());
   state.settings.theme ??= 'system';
+  // The hints are long-form teaching text. On a laptop they sit beside the
+  // list; on a phone they'd be half the first screen, so a fresh install
+  // starts with them off there. Toggle lives under More → Method hints.
+  state.settings.showHints ??= !coarsePointer;
   applyTheme(state.settings.theme);
   if (M.rollover(state, M.todayStr())) await store.save(state);
+
+  TaskmanaUI.initSheets();
+  // Re-render on view change so the tab bar's active state and counts follow.
+  TaskmanaNav.subscribe(() => renderTabs(M.todayStr()));
+  TaskmanaNav.init();
+
+  TaskmanaSwipe.init((row, dir) => {
+    const task = state.tasks.find((t) => t.id === row.dataset.id);
+    const kind = /** @type {'today' | 'inbox' | 'someday' | 'recycle'} */ (
+      /** @type {HTMLElement} */ (row.closest('[data-swipe]'))?.dataset.swipe ?? 'inbox'
+    );
+    if (!task) return;
+    const list = M.todayList(state);
+    const action = rowActions(task, kind, {
+      idx: list.indexOf(task),
+      count: list.length,
+      room: M.todayHasRoom(state),
+      today: M.todayStr(),
+    }).find((a) => a.swipe === dir);
+    if (action) void runAction(action);
+  });
+
   render();
 
   // iOS evicts a plain tab's localStorage after ~7 days unused. Asking for
@@ -776,7 +1057,9 @@ async function init() {
   // silently for installed apps and ignore it otherwise.
   navigator.storage?.persist?.().catch(() => {});
 
-  $input('capture-input').focus();
+  // Keyboard-first on desktop; on touch this would pop the soft keyboard on
+  // every single launch of the installed app, which is actively hostile.
+  if (finePointer) $input('capture-input').focus();
 
   TaskmanaSync.onStatus(renderSync);
   TaskmanaSync.init({

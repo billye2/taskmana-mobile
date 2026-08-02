@@ -20,6 +20,16 @@
   --success: #15803d;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* layout constants shared between the fixed dock and the page padding that
+     keeps content out from under it — they must not drift apart */
+  --tap: 44px;
+  --tabbar-h: 56px;
+  --dock-h: 112px;
+  --sheet-radius: 18px;
+  /* published by js/viewport.js from visualViewport; 0 unless a soft keyboard
+     is up (iOS never resizes the layout viewport for it) */
+  --kb-inset: 0px;
 }
 
 /* Dark tokens apply when the user forces dark, or in Auto mode when the
@@ -88,7 +98,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
+  /* 14px reads small at arm's length on a phone; 15 keeps the density that
+     makes this app feel calm without needing a per-breakpoint scale */
+  font-size: 15px;
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -96,54 +108,94 @@ body {
   touch-action: manipulation; /* kills the 300ms double-tap-zoom delay */
 }
 
+/* Mobile-first: full-bleed column with room at the bottom for the fixed dock.
+   The desktop column is restored at >=768px. */
 .page {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 8vh 24px 80px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + 24px);
 }
 
-/* ---- header ---- */
+/* ---- views ---- */
 
-.masthead {
+/* Only the routed view renders. display:none (rather than visibility or
+   aria-hidden) takes the others out of the accessibility tree and the tab
+   order too, so nothing extra has to be bookkept. */
+.view {
+  display: none;
+}
+
+body[data-view="today"] #today-section,
+body[data-view="inbox"] #inbox-section,
+body[data-view="someday"] #someday-section,
+body[data-view="more"] #more-section {
+  display: block;
+}
+
+/* ---- appbar ---- */
+
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+  /* pays back the inset that black-translucent takes, so the date line never
+     sits under the clock */
+  padding: calc(env(safe-area-inset-top) + 8px) max(16px, env(safe-area-inset-left)) 8px
+    max(16px, env(safe-area-inset-right));
+  background: color-mix(in srgb, var(--background) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 #date-line {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--foreground);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.masthead-actions {
+.appbar-actions {
   display: flex;
   gap: 6px;
+  flex: none;
+}
+
+/* Each view gets at most two actions; the rest stay in the DOM but hidden.
+   Desktop reveals them all (see the >=768px block). */
+.appbar-actions .chip {
+  display: none;
+}
+
+body[data-view="today"] #focus-toggle,
+body[data-view="today"] #plan-btn,
+body[data-view="inbox"] #review-btn {
+  display: inline-flex;
 }
 
 .chip {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted-fg);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 6px;
+  padding: 0 14px;
+  border-radius: 8px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: border-color 0.12s, color 0.12s, background 0.12s;
-}
-
-.chip:hover {
-  color: var(--foreground);
-  border-color: var(--border-strong);
-  background: var(--accent-bg);
 }
 
 .chip.active {
@@ -163,16 +215,119 @@ body {
   border: 2px solid var(--background);
 }
 
-/* ---- capture ---- */
+/* ---- bottom dock: capture bar + tab bar ---- */
+
+.bottom-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding: 8px max(12px, env(safe-area-inset-left)) 0 max(12px, env(safe-area-inset-right));
+  padding-bottom: env(safe-area-inset-bottom);
+  /* iOS never resizes the layout viewport for the keyboard, so a bottom-pinned
+     element would sit behind it. js/viewport.js publishes the real inset. */
+  transform: translateY(calc(-1 * var(--kb-inset, 0px)));
+  transition: transform 0.15s ease-out;
+}
+
+/* Keyboard up: give the whole dock to the input. */
+body.kb-open .bottom-dock {
+  padding-bottom: 0;
+}
+
+body.kb-open .tabbar {
+  display: none;
+}
 
 .capture {
-  margin-bottom: 32px;
+  margin-bottom: 8px;
+}
+
+/* Capture belongs on every list — GTD's premise is capturing the instant a
+   thought arrives — but More is settings, and there is nothing to capture to. */
+body[data-view="more"] .capture {
+  display: none;
+}
+
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  height: var(--tabbar-h);
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted-fg);
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.12s;
+}
+
+.tab.active {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.tab:active {
+  background: var(--accent-bg);
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-fg);
+  background: var(--accent-bg);
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 18px;
+}
+
+.tab-count:empty {
+  display: none;
+}
+
+.tab.active .tab-count {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
 }
 
 #capture-input {
   width: 100%;
+  min-height: var(--tap);
   padding: 11px 14px;
-  font-size: 14px;
+  /* 16px is the threshold below which iOS Safari zooms the page on focus.
+     Applied unconditionally — it looks fine on desktop too. */
+  font-size: 16px;
   font-family: inherit;
   color: var(--foreground);
   background: var(--surface);
@@ -199,7 +354,6 @@ body {
 }
 
 .section-head,
-.someday summary,
 .recycle summary {
   display: flex;
   align-items: baseline;
@@ -256,22 +410,21 @@ body.hints-off .hint {
 }
 
 .example-btn {
+  display: inline-grid;
+  place-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted-fg);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1;
-  padding: 3px 8px;
+  padding: 0 8px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.12s, color 0.12s;
-}
-
-.example-btn:hover {
-  color: var(--foreground);
-  border-color: var(--border-strong);
 }
 
 .dialog .hint-example {
@@ -284,19 +437,18 @@ body.hints-off .hint {
   padding: 6px 2px;
 }
 
-.someday summary,
 .recycle summary {
   cursor: pointer;
   list-style: none;
   user-select: none;
+  min-height: var(--tap);
+  align-items: center;
 }
 
-.someday summary::-webkit-details-marker,
 .recycle summary::-webkit-details-marker {
   display: none;
 }
 
-.someday summary::before,
 .recycle summary::before {
   content: "▸";
   color: var(--faint);
@@ -304,7 +456,6 @@ body.hints-off .hint {
   margin-right: 2px;
 }
 
-.someday[open] summary::before,
 .recycle[open] summary::before {
   content: "▾";
 }
@@ -340,8 +491,11 @@ body.hints-off .hint {
 }
 
 #today-list .task {
-  padding: 11px 14px;
   border-radius: 0;
+}
+
+#today-list .swipe-fg {
+  padding: 5px 14px;
 }
 
 #today-list .task + .task,
@@ -349,17 +503,85 @@ body.hints-off .hint {
   border-top: 1px solid var(--border);
 }
 
+/* A row is a stack: the action background, and the foreground that slides
+   over it. Only .swipe-fg moves. */
 .task {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 7px 10px;
+  position: relative;
+  overflow: hidden;
   border-radius: 8px;
-  transition: background 0.1s;
 }
 
-.plain .task:hover {
+.swipe-fg {
+  position: relative;
+  display: flex;
+  /* The 44px controls set the row height, so top-aligning would leave dead
+     space under a single line of text. */
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  /* Must be opaque, or the action background shows through at rest. */
+  background: var(--background);
+  transition: background 0.1s;
+  /* Hands vertical scrolling to the compositor while leaving the horizontal
+     axis to us. Never `none` here — that would kill scrolling over every row. */
+  touch-action: pan-y;
+}
+
+#today-list .swipe-fg {
+  background: var(--surface);
+}
+
+.swipe-bg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
   background: var(--accent-bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The labels carry the meaning and the feedback: outlined while you're
+   dragging, filled the moment the action is armed. No direction bookkeeping
+   on the container. */
+.bg-lead,
+.bg-trail {
+  padding: 7px 12px;
+  border-radius: 999px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.bg-lead {
+  color: var(--success);
+}
+
+.bg-trail {
+  color: var(--muted-fg);
+}
+
+.bg-trail.danger {
+  color: var(--danger);
+}
+
+.task.armed-lead .bg-lead {
+  background: var(--success);
+  color: var(--primary-fg);
+}
+
+.task.armed-trail .bg-trail {
+  background: var(--muted-fg);
+  color: var(--background);
+}
+
+.task.armed-trail .bg-trail.danger {
+  background: var(--danger);
+  color: var(--primary-fg);
+}
+
+.task.swiping .swipe-fg {
+  transition: none;
 }
 
 #today-list .task.top .text {
@@ -380,23 +602,30 @@ body.hints-off .hint {
   border-top: 1px solid var(--border);
 }
 
+/* A 22px box centred in a full-size hit target: the checkbox stays visually
+   quiet while the thing you actually tap meets the 44px minimum. */
+.check-wrap {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  min-width: var(--tap);
+  margin: -6px 0 -6px -8px;
+  cursor: pointer;
+}
+
 .task .check {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  margin-top: 3px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
   border: 1.5px solid var(--border-strong);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   display: grid;
   place-content: center;
   background: var(--surface);
   transition: background 0.1s, border-color 0.1s;
-}
-
-.task .check:hover {
-  border-color: var(--ring);
 }
 
 .task .check:checked {
@@ -407,7 +636,7 @@ body.hints-off .hint {
 .task .check:checked::before {
   content: "✓";
   color: var(--primary-fg);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
 }
@@ -441,9 +670,7 @@ body.hints-off .hint {
   line-height: 1.25;
 }
 
-#today-list .task.focused .check {
-  margin-top: 9px;
-}
+
 
 .migrations {
   color: var(--amber);
@@ -453,39 +680,88 @@ body.hints-off .hint {
   font-size: 12px;
 }
 
+/* Touch shows one overflow button per row; the full inline row is a desktop
+   affordance. Three 44px buttons plus the text does not fit a 390pt screen —
+   and in Focus mode the text renders at 2em. */
 .task .actions {
-  display: flex;
+  display: none;
   gap: 1px;
-  opacity: 0;
   transition: opacity 0.1s;
 }
 
-.task:hover .actions,
-.task:focus-within .actions {
-  opacity: 1;
+.row-more {
+  flex: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--faint);
+}
+
+/* Action list inside the per-row sheet. */
+.sheet-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.sheet-action {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheet-action:active {
+  background: var(--accent-bg);
+}
+
+.sheet-action.danger {
+  color: var(--danger);
+}
+
+.sheet-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#row-actions-title {
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  min-width: var(--tap);
   border: none;
   background: none;
   color: var(--muted-fg);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   font-family: inherit;
-  padding: 3px 7px;
-  border-radius: 5px;
+  padding: 0 10px;
+  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.1s, color 0.1s;
 }
 
-.icon-btn:hover {
+.icon-btn:active {
   background: var(--accent-bg);
-  color: var(--foreground);
-}
-
-#today-list .icon-btn:hover {
-  background: var(--background);
 }
 
 .icon-btn:disabled {
@@ -493,13 +769,14 @@ body.hints-off .hint {
   cursor: default;
 }
 
-.icon-btn.danger:hover {
-  color: var(--danger);
+.icon-btn:disabled:active {
+  background: none;
 }
 
 .edit-input {
   width: 100%;
   font: inherit;
+  font-size: 16px; /* iOS focus-zoom guard */
   color: inherit;
   background: var(--surface);
   border: 1px solid var(--ring);
@@ -529,10 +806,6 @@ body.hints-off .hint {
   font-weight: 500;
 }
 
-.migration-prompt .icon-btn:hover {
-  background: color-mix(in srgb, var(--amber) 15%, transparent);
-}
-
 /* ---- footer / done log ---- */
 
 .footer {
@@ -552,20 +825,22 @@ body.hints-off .hint {
 }
 
 .link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   border: none;
   background: none;
   color: var(--muted-fg);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 5px;
+  padding: 0 8px;
+  border-radius: 8px;
   transition: color 0.1s, background 0.1s;
 }
 
-.link-btn:hover {
-  color: var(--foreground);
+.link-btn:active {
   background: var(--accent-bg);
 }
 
@@ -578,6 +853,7 @@ body.hints-off .hint {
 }
 
 .done-log .task {
+  display: flex;
   padding: 3px 10px;
   color: var(--muted-fg);
   font-size: 13px;
@@ -595,18 +871,15 @@ body.hints-off .hint {
   cursor: pointer;
   list-style: none;
   user-select: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   color: var(--muted-fg);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 3px 6px;
-  border-radius: 5px;
+  padding: 0 8px;
+  border-radius: 8px;
   transition: color 0.1s, background 0.1s;
-}
-
-.history summary:hover {
-  color: var(--foreground);
-  background: var(--accent-bg);
 }
 
 .history summary::-webkit-details-marker {
@@ -634,6 +907,140 @@ body.hints-off .hint {
   padding-left: 6px;
 }
 
+/* ---- the More screen ---- */
+
+.more-group {
+  margin-bottom: 28px;
+}
+
+.more-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-fg);
+  margin-bottom: 8px;
+  display: inline;
+}
+
+.more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.1s, border-color 0.12s;
+}
+
+.more-row + .more-row {
+  margin-top: 6px;
+}
+
+.more-row:active {
+  background: var(--accent-bg);
+}
+
+.more-row-value {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-fg);
+  font-size: 13.5px;
+  flex: none;
+}
+
+.more-note {
+  font-size: 12.5px;
+  color: var(--muted-fg);
+  margin-top: 8px;
+}
+
+/* segmented control (theme) */
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.seg {
+  flex: 1;
+  min-height: var(--tap);
+  border: none;
+  background: none;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted-fg);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.seg.active {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.seg:not(.active):active {
+  background: var(--accent-bg);
+}
+
+/* ---- toast ---- */
+
+.toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  z-index: 30;
+  bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + var(--kb-inset, 0px) + 12px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px 6px 16px;
+  border-radius: 12px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 14px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  translate: 0 8px;
+  transition: opacity 0.18s, translate 0.18s;
+}
+
+.toast.show {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.toast-action {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background) 20%, transparent);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ---- dialogs ---- */
 
 .dialog {
@@ -652,6 +1059,130 @@ body.hints-off .hint {
 .dialog::backdrop {
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
+}
+
+/* ---- bottom sheets (mobile presentation of the dialogs) ---- */
+
+/* The [open] qualifier is load-bearing: an unqualified author `display` beats
+   the UA's `dialog:not([open]) { display: none }` and every sheet would render
+   permanently. Same failure family as the [hidden] note in the reset above. */
+.sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet {
+  margin: auto auto 0; /* bottom-anchored instead of centred */
+  width: 100%;
+  max-width: none;
+  max-height: 92dvh;
+  border: none;
+  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+  padding: 0;
+}
+
+.sheet-grab {
+  flex: none;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  margin: 8px auto 4px;
+}
+
+.sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 12px 8px 20px;
+}
+
+.sheet-close {
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: none;
+  background: none;
+  border-radius: 999px;
+  color: var(--muted-fg);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.sheet-close:active {
+  background: var(--accent-bg);
+}
+
+/* The only scroller in the sheet. min-height:0 is required or the flex item
+   refuses to shrink below its content and the sheet overflows instead. */
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 20px calc(16px + var(--kb-inset, 0px));
+}
+
+.sheet-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+}
+
+.sheet-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stops the page behind a sheet from rubber-banding on iOS. */
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* @starting-style + allow-discrete animate an element entering the top
+     layer. Chrome 117+ / Safari 17.4+; older engines get an instant sheet that
+     works identically, which is why there's no JS fallback. */
+  .sheet {
+    translate: 0 100%;
+    transition: translate 0.28s cubic-bezier(0.32, 0.72, 0, 1), overlay 0.28s allow-discrete,
+      display 0.28s allow-discrete;
+  }
+
+  .sheet[open] {
+    translate: 0 0;
+  }
+
+  @starting-style {
+    .sheet[open] {
+      translate: 0 100%;
+    }
+  }
+
+  .sheet::backdrop {
+    opacity: 0;
+    transition: opacity 0.28s, overlay 0.28s allow-discrete, display 0.28s allow-discrete;
+  }
+
+  .sheet[open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .sheet[open]::backdrop {
+      opacity: 0;
+    }
+  }
 }
 
 .dialog h2 {
@@ -699,21 +1230,24 @@ body.hints-off .hint {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--foreground);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   font-family: inherit;
-  padding: 6px 14px;
-  border-radius: 7px;
+  padding: 0 16px;
+  border-radius: 9px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
 
-.btn:hover {
-  border-color: var(--border-strong);
+.btn:active {
   background: var(--accent-bg);
 }
 
@@ -722,7 +1256,11 @@ body.hints-off .hint {
   cursor: default;
 }
 
-.btn.danger:hover {
+.btn:disabled:active {
+  background: var(--surface);
+}
+
+.btn.danger:active {
   border-color: var(--danger);
   color: var(--danger);
   background: none;
@@ -734,8 +1272,9 @@ body.hints-off .hint {
   color: var(--primary-fg);
 }
 
-#plan-save:hover {
+#plan-save:active {
   opacity: 0.9;
+  background: var(--primary);
 }
 
 .dialog-foot {
@@ -747,13 +1286,13 @@ body.hints-off .hint {
 /* plan tomorrow */
 
 .plan-list {
-  max-height: 46vh;
-  overflow-y: auto;
   margin-bottom: 14px;
 }
 
 .plan-row {
   width: 100%;
+  min-height: 52px;
+  align-items: center;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -763,7 +1302,7 @@ body.hints-off .hint {
   padding: 8px 10px;
 }
 
-.plan-row:hover {
+.plan-row:active {
   background: var(--accent-bg);
 }
 
@@ -875,12 +1414,14 @@ body.hints-off .hint {
 .sync-form input {
   flex: 1;
   min-width: 0;
+  min-height: var(--tap);
   font: inherit;
+  font-size: 16px; /* iOS focus-zoom guard */
   color: var(--foreground);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 6px 10px;
+  border-radius: 9px;
+  padding: 6px 12px;
   outline: none;
 }
 
@@ -904,37 +1445,283 @@ body.hints-off .hint {
   margin-bottom: 12px;
 }
 
-/* ---- touch (iPhone PWA) ------------------------------------------------- */
-/* (hover: none) never matches a mouse-driven desktop, so none of this
-   affects the extension or the visual-regression baselines. */
+/* ---- hover enhancement -------------------------------------------------- */
+/* Everything above is the touch baseline. Hover states live here, in one
+   place, so a mouse gets richer feedback without touch inheriting affordances
+   it can never trigger. Trailing position means these win on source order. */
 
-@media (hover: none) {
-  .task .actions {
-    opacity: 1; /* no hover to reveal them with */
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    color: var(--foreground);
+    border-color: var(--border-strong);
+    background: var(--accent-bg);
   }
 
-  .icon-btn {
-    padding: 9px 10px;
+  .example-btn:hover {
+    color: var(--foreground);
+    border-color: var(--border-strong);
+  }
+
+  .task .check:hover {
+    border-color: var(--ring);
+  }
+
+  /* With a mouse there's room for the inline row, and hover to reveal it —
+     so the overflow button isn't needed. */
+  .task .actions {
+    display: flex;
+    opacity: 0;
+  }
+
+  .task:hover .actions,
+  .task:focus-within .actions {
+    opacity: 1;
+  }
+
+  .row-more {
+    display: none;
+  }
+
+  .plain .swipe-fg:hover {
+    background: var(--accent-bg);
+  }
+
+  .icon-btn:hover {
+    background: var(--accent-bg);
+    color: var(--foreground);
+  }
+
+  #today-list .icon-btn:hover {
+    background: var(--background);
+  }
+
+  .icon-btn.danger:hover {
+    color: var(--danger);
+  }
+
+  .icon-btn:disabled:hover {
+    background: none;
+    color: var(--muted-fg);
+  }
+
+  .migration-prompt .icon-btn:hover {
+    background: color-mix(in srgb, var(--amber) 15%, transparent);
+  }
+
+  .link-btn:hover {
+    color: var(--foreground);
+    background: var(--accent-bg);
+  }
+
+  .history summary:hover {
+    color: var(--foreground);
+    background: var(--accent-bg);
+  }
+
+  .btn:hover {
+    border-color: var(--border-strong);
+    background: var(--accent-bg);
+  }
+
+  .btn:disabled:hover {
+    border-color: var(--border);
+    background: var(--surface);
+  }
+
+  .btn.danger:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: none;
+  }
+
+  #plan-save:hover {
+    opacity: 0.9;
+    background: var(--primary);
+  }
+
+  .plan-row:hover {
+    background: var(--accent-bg);
+  }
+}
+
+/* ---- desktop ------------------------------------------------------------ */
+/* The one width breakpoint in the file. Mobile is the base; this restores the
+   centred reading column for a laptop. */
+
+@media (min-width: 768px) {
+  .page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 24px calc(var(--dock-h) + 40px);
+  }
+
+  /* No tabs on a laptop: every section is on the page at once, the way it was
+     before the shell existed. */
+  .view {
+    display: block;
+  }
+
+  .view + .view {
+    margin-top: 8px;
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .appbar {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 8vh 24px 16px;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    position: static;
+  }
+
+  .appbar-actions .chip,
+  body[data-view="today"] #focus-toggle,
+  body[data-view="today"] #plan-btn,
+  body[data-view="inbox"] #review-btn {
+    display: inline-flex;
+  }
+
+  .bottom-dock {
+    max-width: 640px;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    padding: 10px 16px;
+  }
+
+  .capture {
+    margin-bottom: 0;
+  }
+
+  /* Back to a centred modal, not a sheet. */
+  .sheet {
+    margin: auto;
+    width: min(520px, 92vw);
+    max-height: 85vh;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    translate: none;
+  }
+
+  @starting-style {
+    .sheet[open] {
+      translate: none;
+    }
+  }
+
+  .sheet-grab {
+    display: none;
+  }
+
+  .sheet-head {
+    padding: 20px 12px 8px 24px;
+  }
+
+  .sheet-body {
+    padding: 0 24px 16px;
+  }
+
+  .sheet-foot {
+    padding: 12px 24px;
+  }
+
+  .plan-list {
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+
+  .toast {
+    left: auto;
+    right: 24px;
+    max-width: 380px;
+  }
+
+  /* A 44px hit box per row is right for a thumb and far too airy for a mouse. */
+  .check-wrap {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    margin: 0;
+  }
+
+  .swipe-fg {
+    align-items: flex-start;
+    padding: 7px 10px;
+  }
+
+  #today-list .swipe-fg {
+    padding: 11px 14px;
+  }
+
+  .check-wrap {
+    margin-top: 2px;
   }
 
   .task .check {
-    width: 20px;
-    height: 20px;
-    min-width: 20px;
+    width: 17px;
+    height: 17px;
+    min-width: 17px;
   }
 
-  /* 16px+ stops iOS Safari from zooming the page when an input focuses */
+  .task .check:checked::before {
+    font-size: 10px;
+  }
+
+  .chip,
+  .icon-btn,
+  .link-btn,
+  .btn,
+  .example-btn,
+  .recycle summary,
+  .history summary,
   #capture-input,
-  .edit-input {
-    font-size: 16px;
+  .sync-form input {
+    min-height: 0;
   }
 
-  /* status-bar-style=black-translucent draws the page under the clock, so the
-     top inset has to be paid back here or the date line hides behind it. */
-  .page {
-    padding-top: calc(env(safe-area-inset-top) + 20px);
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: max(80px, env(safe-area-inset-bottom));
+  .icon-btn,
+  .example-btn {
+    min-width: 0;
+  }
+
+  .chip {
+    padding: 5px 12px;
+    font-size: 12.5px;
+  }
+
+  .icon-btn {
+    padding: 3px 7px;
+    font-size: 12px;
+  }
+
+  .link-btn {
+    padding: 3px 6px;
+    font-size: 12.5px;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+
+  .example-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .history summary {
+    padding: 3px 6px;
+    font-size: 12.5px;
+  }
+
+  .plan-row {
+    min-height: 0;
+    align-items: flex-start;
   }
 }

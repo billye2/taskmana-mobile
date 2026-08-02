@@ -1,7 +1,7 @@
 // PWA service worker. Cache-first app shell keyed by release version;
 // scripts/bump-version.mjs rewrites VERSION so every release invalidates the
 // phone's cached copy.
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const CACHE = `taskmana-${VERSION}`;
 // Every script index.html loads must be here — a missing one 404s on an
 // offline cold start and the app boots into a blank page.
@@ -13,6 +13,10 @@ const ASSETS = [
   '/js/model.js',
   '/js/config.js',
   '/js/sync.js',
+  '/js/nav.js',
+  '/js/ui.js',
+  '/js/viewport.js',
+  '/js/swipe.js',
   '/js/app.js',
   '/manifest.webmanifest',
   '/icons/icon180.png',
