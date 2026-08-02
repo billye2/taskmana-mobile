@@ -1,30 +1,24 @@
-// Storage layer: chrome.storage.local inside the extension, localStorage when
-// newtab.html is opened as a plain page (development / preview).
+// Storage layer: localStorage under a single key.
 
-// Classic script (not an ES module) so newtab.html also works opened straight
-// from file://, where module imports are blocked by CORS.
+// Classic script (not an ES module) so the app has no build step — every file
+// is a plain <script> and top-level consts are the cross-file namespace.
 const TaskmanaStore = (() => {
   const KEY = 'taskmana-state';
 
-  const hasChromeStorage =
-    typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
-
   /** @returns {Promise<State | null>} */
   async function load() {
-    if (hasChromeStorage) {
-      const res = await chrome.storage.local.get(KEY);
-      return res[KEY] ?? null;
-    }
     const raw = localStorage.getItem(KEY);
     return raw ? JSON.parse(raw) : null;
   }
 
   /** @param {State} state */
   async function save(state) {
-    if (hasChromeStorage) {
-      await chrome.storage.local.set({ [KEY]: state });
-    } else {
+    try {
       localStorage.setItem(KEY, JSON.stringify(state));
+    } catch (err) {
+      // Quota exceeded, or Safari private mode where setItem always throws.
+      // Keep going — the in-memory state is still correct and sync may carry it.
+      console.error('taskmana: could not save state', err);
     }
     // Optional sync layer (js/sync.js); absent in tests and when signed out.
     /** @type {any} */ (globalThis).TaskmanaSync?.onLocalSave?.();

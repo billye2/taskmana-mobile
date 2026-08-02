@@ -79,6 +79,11 @@
   display: none !important;
 }
 
+html {
+  /* no pull-to-refresh / rubber-band in a browser tab */
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -87,6 +92,8 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  touch-action: manipulation; /* kills the 300ms double-tap-zoom delay */
 }
 
 .page {
@@ -922,7 +929,10 @@ body.hints-off .hint {
     font-size: 16px;
   }
 
+  /* status-bar-style=black-translucent draws the page under the clock, so the
+     top inset has to be paid back here or the date line hides behind it. */
   .page {
+    padding-top: calc(env(safe-area-inset-top) + 20px);
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
     padding-bottom: max(80px, env(safe-area-inset-bottom));

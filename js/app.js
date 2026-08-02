@@ -447,11 +447,40 @@ $('done-toggle').addEventListener('click', () => {
 
 // ---- backup: export / import ------------------------------------------------
 
-function exportBackup() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+/** Installed-app mode, where an <a download> click is unreliable on iOS. */
+function isStandalone() {
+  return (
+    matchMedia('(display-mode: standalone)').matches ||
+    /** @type {any} */ (navigator).standalone === true
+  );
+}
+
+async function exportBackup() {
+  const json = JSON.stringify(state, null, 2);
+  const name = `taskmana-backup-${M.todayStr()}.json`;
+
+  // In an installed iOS PWA, clicking an <a download> either does nothing or
+  // navigates the app away with no way back — and this is the only backup
+  // route. Hand it to the share sheet instead. Called from a click handler, so
+  // the user activation navigator.share() requires is present.
+  if (isStandalone() && navigator.canShare) {
+    const file = new File([json], name, { type: 'application/json' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Taskmana backup' });
+        return;
+      } catch (err) {
+        // AbortError just means the user dismissed the sheet — don't then
+        // spring a download on them. Anything else falls through to the anchor.
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+  }
+
+  const blob = new Blob([json], { type: 'application/json' });
   const a = el('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `taskmana-backup-${M.todayStr()}.json`;
+  a.download = name;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -741,6 +770,12 @@ async function init() {
   applyTheme(state.settings.theme);
   if (M.rollover(state, M.todayStr())) await store.save(state);
   render();
+
+  // iOS evicts a plain tab's localStorage after ~7 days unused. Asking for
+  // persistent storage materially reduces that risk; browsers grant it
+  // silently for installed apps and ignore it otherwise.
+  navigator.storage?.persist?.().catch(() => {});
+
   $input('capture-input').focus();
 
   TaskmanaSync.onStatus(renderSync);
@@ -755,10 +790,19 @@ async function init() {
   });
   renderSync();
 
-  // PWA app shell — web deployment only, never inside the extension.
-  const inExtension = typeof chrome !== 'undefined' && chrome.storage?.local;
-  if (!inExtension && 'serviceWorker' in navigator && location.protocol === 'https:') {
+  // PWA app shell. https-only so the plain http test server never registers a
+  // worker (a cached shell across test runs is a flake factory).
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js');
+    // sw.js calls skipWaiting() + clients.claim(), so a new release can take
+    // over mid-session and start serving CSS/JS the live page never parsed.
+    // Reload once when that happens rather than run on a half-swapped shell.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    });
   }
 }
 

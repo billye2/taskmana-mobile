@@ -1,16 +1,13 @@
-// Bump the release version in manifest.json and package.json (see
-// version-lib.mjs for the 1.0.9 -> 1.1.0 roll-over scheme).
+// Bump the release version in package.json (see version-lib.mjs for the
+// 1.0.9 -> 1.1.0 roll-over scheme).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { bumpVersion } from './version-lib.mjs';
 
-let next = '';
-for (const file of ['manifest.json', 'package.json']) {
-  const json = JSON.parse(readFileSync(file, 'utf8'));
-  next = bumpVersion(json.version);
-  json.version = next;
-  writeFileSync(file, JSON.stringify(json, null, 2) + '\n');
-  console.log(`${file}: -> ${next}`);
-}
+const json = JSON.parse(readFileSync('package.json', 'utf8'));
+const next = bumpVersion(json.version);
+json.version = next;
+writeFileSync('package.json', JSON.stringify(json, null, 2) + '\n');
+console.log(`package.json: -> ${next}`);
 
 // Keep the service worker's cache key in step so every release invalidates
 // the installed PWA's cached shell.

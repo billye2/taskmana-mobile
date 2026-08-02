@@ -1,14 +1,10 @@
-// Touch-device smoke test for the PWA path: plain page + localStorage (no
-// extension fixture), Chromium mobile emulation so (hover: none) matches.
+// Touch-device smoke test: Chromium mobile emulation so (hover: none) matches.
 import { test, expect, devices } from '@playwright/test';
-import path from 'node:path';
 
 test.use({ ...devices['Pixel 7'] });
 
-const PAGE_URL = 'file://' + path.resolve(__dirname, '../../newtab.html');
-
 test('touch: actions are visible without hover and a single tap edits', async ({ page }) => {
-  await page.goto(PAGE_URL);
+  await page.goto('/');
   await page.waitForFunction(() => !!document.getElementById('date-line')?.textContent);
 
   // capture works on the plain-page/localStorage path

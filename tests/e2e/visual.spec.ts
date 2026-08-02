@@ -30,11 +30,11 @@ function seed(state: any) {
 }
 
 for (const scheme of ['light', 'dark'] as const) {
-  test(`new tab visual — ${scheme}`, async ({ page }) => {
+  test(`page visual — ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await writeStateAndReload(page, seed);
     await expect(page.locator('#today-list .task')).toHaveCount(4);
-    await expect(page).toHaveScreenshot(`newtab-${scheme}.png`, {
+    await expect(page).toHaveScreenshot(`page-${scheme}.png`, {
       fullPage: true,
       mask: [page.locator('#date-line')],
     });

@@ -1,7 +1,6 @@
 import { test, expect, capture, readState, writeStateAndReload, localDate } from './fixtures';
 
-test('new tab override loads and captured tasks persist across reload', async ({ page }) => {
-  expect(page.url()).toMatch(/^chrome-extension:/);
+test('app loads and captured tasks persist across reload', async ({ page }) => {
   await capture(page, 'buy milk');
   await capture(page, 'call mom');
   await page.reload();

@@ -67,8 +67,10 @@ const TaskmanaSync = (() => {
     return client;
   }
 
+  // Prefixed because the Supabase project is shared with other apps — a bare
+  // `states` table there is a collision waiting to happen.
   function db() {
-    return client.from('states');
+    return client.from('taskmana_states');
   }
 
   // ---- sync meta ------------------------------------------------------------

@@ -1,13 +1,17 @@
 {
+  "id": "/",
   "name": "Taskmana",
   "short_name": "Taskmana",
   "description": "A calm personal task system: daily top-3, brain dump, bullet-journal migration, and an Ivy Lee queue.",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "categories": ["productivity"],
   "background_color": "#fafafa",
   "theme_color": "#fafafa",
   "icons": [
-    { "src": "/icons/icon192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icons/icon192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

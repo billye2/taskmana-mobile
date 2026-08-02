@@ -1,30 +1,12 @@
-// Fixtures that load the real unpacked extension into Chromium and open its
-// new-tab page — the same path a user exercises, chrome.storage included.
-import { test as base, chromium, type BrowserContext } from '@playwright/test';
-import path from 'node:path';
-import os from 'node:os';
-import fs from 'node:fs';
+// Fixtures that open the app over http and drive its real localStorage — the
+// same path a user on the deployed URL exercises.
+import { test as base } from '@playwright/test';
 
-const EXT_PATH = path.resolve(__dirname, '../..');
+const KEY = 'taskmana-state';
 
-export const test = base.extend<{ context: BrowserContext }>({
-  context: async ({}, use) => {
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'taskmana-e2e-'));
-    const context = await chromium.launchPersistentContext(userDataDir, {
-      channel: 'chromium',
-      args: [
-        `--disable-extensions-except=${EXT_PATH}`,
-        `--load-extension=${EXT_PATH}`,
-      ],
-    });
-    await use(context);
-    await context.close();
-    fs.rmSync(userDataDir, { recursive: true, force: true });
-  },
-  page: async ({ context }, use) => {
-    const page = await context.newPage();
-    await page.goto('chrome://newtab/');
-    await page.waitForURL(/^chrome-extension:.*newtab\.html$/);
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    await page.goto('/');
     // The DOM exists before the app's async init; wait for the first render
     // (the date line is only filled in then) before interacting.
     await page.waitForFunction(() => !!document.getElementById('date-line')?.textContent);
@@ -41,16 +23,12 @@ export async function capture(page: import('@playwright/test').Page, text: strin
   await expect(page.locator('#inbox-list .task .text').first()).toHaveText(text);
 }
 
-/** Read the persisted state straight from chrome.storage. */
+/** Read the persisted state straight from localStorage. */
 export function readState(page: import('@playwright/test').Page): Promise<any> {
-  return page.evaluate(
-    () =>
-      new Promise((resolve) =>
-        chrome.storage.local.get('taskmana-state', (s: Record<string, unknown>) =>
-          resolve(s['taskmana-state'])
-        )
-      )
-  );
+  return page.evaluate((k) => {
+    const raw = localStorage.getItem(k);
+    return raw ? JSON.parse(raw) : null;
+  }, KEY);
 }
 
 /** Overwrite persisted state and reload so the app boots from it. */
@@ -66,10 +44,10 @@ export async function writeStateAndReload(
     (await readState(page)) ??
     (await page.evaluate('TaskmanaModel.initialState(TaskmanaModel.todayStr())'));
   mutate(state);
-  await page.evaluate(
-    (s) => new Promise<void>((resolve) => chrome.storage.local.set({ 'taskmana-state': s }, resolve)),
-    state
-  );
+  await page.evaluate(([k, s]) => localStorage.setItem(k as string, JSON.stringify(s)), [
+    KEY,
+    state,
+  ] as const);
   await page.reload();
   await page.locator('#capture-input').waitFor();
 }
