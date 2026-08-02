@@ -210,6 +210,8 @@ function editableText(task) {
  * @property {boolean} [disabled]
  * @property {'left' | 'right'} [swipe]
  * @property {string} [swipeLabel]     wording on the revealed swipe background
+ * @property {boolean} [primary]       visible on the row even on touch — the
+ *                                     rest stay behind the overflow button
  */
 
 /**
@@ -226,6 +228,7 @@ function rowActions(task, kind, ctx) {
     label: '✕',
     title: `Drop: ${task.text}`,
     danger: true,
+    primary: true,
     swipe: 'left',
     swipeLabel: 'Drop',
     undoneMessage: 'Dropped',
@@ -253,6 +256,7 @@ function rowActions(task, kind, ctx) {
       list.push({
         label: 'Inbox',
         title: `Send back to inbox: ${task.text}`,
+        primary: true,
         swipe: 'left',
         swipeLabel: 'To inbox',
         undoneMessage: 'Moved to Inbox',
@@ -277,6 +281,7 @@ function rowActions(task, kind, ctx) {
         label: 'Today',
         title: room ? `Add to today: ${task.text}` : 'Today is full (6 max)',
         disabled: !room,
+        primary: true,
         swipe: 'right',
         swipeLabel: 'To today',
         undoneMessage: 'Added to Today',
@@ -299,6 +304,7 @@ function rowActions(task, kind, ctx) {
       {
         label: 'Inbox',
         title: `Move back to inbox: ${task.text}`,
+        primary: true,
         swipe: 'right',
         swipeLabel: 'To inbox',
         undoneMessage: 'Moved to Inbox',
@@ -315,6 +321,7 @@ function rowActions(task, kind, ctx) {
     {
       label: 'Inbox',
       title: `Restore to inbox: ${task.text}`,
+      primary: true,
       swipe: 'right',
       swipeLabel: 'Restore',
       run: () => M.restoreDropped(state, task.id),
@@ -372,18 +379,24 @@ function taskRow(task, kind, ctx = {}) {
   const body = el('div', 'body');
   row.appendChild(fg);
 
-  // Inline buttons: the desktop surface, and the a11y fallback everywhere.
+  // Inline buttons: all of them on desktop; on touch only the primary ones —
+  // swiping never announced itself, so the key action per list is a visible
+  // button everywhere.
   const actionsEl = el('div', 'actions');
   for (const a of actions) {
-    actionsEl.appendChild(
-      actionBtn(a.label, a.title, () => runAction(a), { danger: a.danger, disabled: a.disabled })
-    );
+    const btn = actionBtn(a.label, a.title, () => runAction(a), {
+      danger: a.danger,
+      disabled: a.disabled,
+    });
+    if (a.primary) btn.classList.add('primary');
+    actionsEl.appendChild(btn);
   }
 
-  // On touch the inline row would leave ~40% of a 390pt screen for the task
-  // text, so the same actions move behind a single overflow button.
+  // The rest (reorder, Someday) stay behind the overflow button; rows whose
+  // actions are all primary don't need one.
   const overflow = actionBtn('⋯', `Actions for: ${task.text}`, () => openRowActions(task, actions));
   overflow.classList.add('row-more');
+  overflow.hidden = actions.every((a) => a.primary);
 
   return { row, fg, body, actions, actionsEl, overflow };
 }
@@ -1097,7 +1110,15 @@ async function init() {
   // PWA app shell. https-only so the plain http test server never registers a
   // worker (a cached shell across test runs is a flake factory).
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // iOS restores the app from memory with no navigation, so the browser's
+      // own update check never runs and a new release sits unnoticed until a
+      // manual refresh. Check on every return to the foreground instead —
+      // controllerchange below finishes the job.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
+      });
+    });
     // sw.js calls skipWaiting() + clients.claim(), so a new release can take
     // over mid-session and start serving CSS/JS the live page never parsed.
     // Reload once when that happens rather than run on a half-swapped shell.

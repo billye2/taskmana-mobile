@@ -34,6 +34,38 @@ test('touch: actions are visible without hover and a single tap edits', async ({
   await expect(page.locator('.edit-input')).toHaveCount(0);
 });
 
+test('touch: each list\'s key actions are visible buttons, not just swipes', async ({ page }) => {
+  // Swiping never announces itself — the actions Billy actually reaches for
+  // (add to Today, Drop, …) must be real buttons on the row.
+  await page.locator('#capture-input').fill('button row');
+  await page.locator('#capture-input').press('Enter');
+  await page.locator('.tab[data-view="inbox"]').tap();
+  const row = page.locator('#inbox-list .task', { hasText: 'button row' });
+
+  // The primary pair is on the row; Someday stays behind the overflow button.
+  await expect(row.getByRole('button', { name: /Add to today/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: /^Drop/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: /Park in Someday/ })).toBeHidden();
+  await expect(row.getByRole('button', { name: /Actions for/ })).toBeVisible();
+
+  // The visible button actually does the thing.
+  await row.getByRole('button', { name: /Add to today/ }).tap();
+  await expect(page.locator('#today-list .task .text')).toHaveText('button row');
+
+  // A Someday row's actions are all primary, so it earns no overflow button.
+  await page.locator('#capture-input').fill('parked');
+  await page.locator('#capture-input').press('Enter');
+  await page.locator('.tab[data-view="inbox"]').tap();
+  const parked = page.locator('#inbox-list .task', { hasText: 'parked' });
+  await parked.getByRole('button', { name: /Actions for/ }).tap();
+  await page.getByRole('button', { name: /Park in Someday/ }).tap();
+  await page.locator('.tab[data-view="someday"]').tap();
+  const somedayRow = page.locator('#someday-list .task', { hasText: 'parked' });
+  await expect(somedayRow.getByRole('button', { name: /Move back to inbox/ })).toBeVisible();
+  await expect(somedayRow.getByRole('button', { name: /^Drop/ })).toBeVisible();
+  await expect(somedayRow.getByRole('button', { name: /Actions for/ })).toBeHidden();
+});
+
 test('touch: the keyboard does not open on launch', async ({ page }) => {
   // In an installed PWA, auto-focusing capture would pop the keyboard on every
   // single launch. Desktop keeps the keyboard-first behaviour (a11y.spec).

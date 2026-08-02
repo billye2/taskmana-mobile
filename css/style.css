@@ -683,13 +683,19 @@ body.hints-off .hint {
   font-size: 12px;
 }
 
-/* Touch shows one overflow button per row; the full inline row is a desktop
-   affordance. Three 44px buttons plus the text does not fit a 390pt screen —
-   and in Focus mode the text renders at 2em. */
+/* Touch shows each list's primary actions as visible buttons (swipe never
+   announced itself); everything else sits behind the overflow button. The
+   full inline row is still a desktop affordance — all of it at once plus the
+   text does not fit a 390pt screen, and in Focus mode the text renders at
+   2em. */
 .task .actions {
-  display: none;
+  display: flex;
   gap: 1px;
   transition: opacity 0.1s;
+}
+
+.task .actions .icon-btn:not(.primary) {
+  display: none;
 }
 
 .row-more {
@@ -1484,8 +1490,11 @@ body:has(dialog[open]) {
   /* With a mouse there's room for the inline row, and hover to reveal it —
      so the overflow button isn't needed. */
   .task .actions {
-    display: flex;
     opacity: 0;
+  }
+
+  .task .actions .icon-btn:not(.primary) {
+    display: inline-flex;
   }
 
   .task:hover .actions,

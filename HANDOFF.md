@@ -16,8 +16,9 @@ to that repo, so pushes to `main` deploy automatically.
   untouched and keeps the extension's history.
 - **Mobile-first shell.** Touch is the base layout; `@media (min-width: 768px)`
   is the only width breakpoint and restores the old single-page desktop column.
-  Four tabs over a fixed dock, hash routing, top sheets, swipe rows with
-  Undo, per-row `⋯` action sheet, in-app toast and confirm replacing
+  Four tabs over a fixed dock, hash routing, top sheets, primary row actions
+  as always-visible buttons (swipe kept as an accelerator with Undo), per-row
+  `⋯` action sheet for the rest, in-app toast and confirm replacing
   `alert()`/`confirm()`.
 - **Three real service-worker bugs fixed** — see the README gotchas. The worst:
   `ASSETS` omitted `js/config.js` and `js/sync.js`, so an offline cold start
