@@ -66,6 +66,14 @@ test('touch: each list\'s key actions are visible buttons, not just swipes', asy
   await expect(somedayRow.getByRole('button', { name: /Actions for/ })).toBeHidden();
 });
 
+test('touch: the Add button captures the field', async ({ page }) => {
+  await page.locator('#capture-input').fill('via button');
+  await page.locator('#capture-add').tap();
+  await page.locator('.tab[data-view="inbox"]').tap();
+  await expect(page.locator('#inbox-list .task .text')).toHaveText('via button');
+  await expect(page.locator('#capture-input')).toHaveValue('');
+});
+
 test('touch: the keyboard does not open on launch', async ({ page }) => {
   // In an installed PWA, auto-focusing capture would pop the keyboard on every
   // single launch. Desktop keeps the keyboard-first behaviour (a11y.spec).

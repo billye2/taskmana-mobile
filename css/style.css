@@ -248,7 +248,27 @@ body.kb-open .tabbar {
 }
 
 .capture {
+  display: flex;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.capture-add {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 18px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-size: 14.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.capture-add:active {
+  opacity: 0.85;
 }
 
 /* Capture belongs on every list — GTD's premise is capturing the instant a
@@ -325,7 +345,8 @@ body[data-view="more"] .capture {
 }
 
 #capture-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: var(--tap);
   padding: 11px 14px;
   /* 16px is the threshold below which iOS Safari zooms the page on focus.
