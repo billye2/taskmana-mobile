@@ -10,6 +10,15 @@ async function expectNoViolations(page: import('@playwright/test').Page) {
   const actions = page.locator('.task .actions').first();
   if (await actions.count()) await expect(actions).toHaveCSS('opacity', /^[01]$/);
 
+  // Dialog cards fade in; axe sampling mid-fade reports contrast violations
+  // that don't exist in the settled UI.
+  const dlg = page.locator('dialog[open]').first();
+  if (await dlg.count()) {
+    await dlg.evaluate(async (n) => {
+      await Promise.all(n.getAnimations().map((a) => a.finished.catch(() => {})));
+    });
+  }
+
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();

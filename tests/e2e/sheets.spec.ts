@@ -1,4 +1,4 @@
-// Top sheets. Mobile emulation — at >=768px these present as centred
+// Popup cards. Mobile emulation — at >=768px these present as centred
 // modals and the keyboard behaviour below doesn't apply.
 import { test, expect, devices } from '@playwright/test';
 
@@ -33,15 +33,16 @@ async function fakeKeyboard(page: import('@playwright/test').Page, px: number) {
   await page.evaluate(`TaskmanaViewport.applyInset(${px})`);
 }
 
-test('sheets anchor to the top, clear of any keyboard', async ({ page }) => {
+test('dialog cards sit near the top, clear of any keyboard', async ({ page }) => {
   await openSync(page);
   const field = page.locator('#sync-email');
   const viewportH = page.viewportSize()!.height;
 
-  // Top-anchored: the keyboard owns the bottom of the screen, so the sheet
-  // starts at the top edge instead of lifting itself out of the way.
+  // A floating card pinned near the top: the keyboard owns the bottom of the
+  // screen, so up here it can never cover the form fields.
   const before = (await page.locator('#sync-dialog').boundingBox())!;
-  expect(before.y).toBeLessThanOrEqual(1);
+  expect(before.y).toBeGreaterThanOrEqual(4);
+  expect(before.y).toBeLessThanOrEqual(24);
 
   const kb = 300;
   await fakeKeyboard(page, kb);
@@ -52,7 +53,21 @@ test('sheets anchor to the top, clear of any keyboard', async ({ page }) => {
   expect(after.y + after.height).toBeLessThanOrEqual(viewportH - kb);
 });
 
-test('pinch/auto-zoom must not read as a keyboard', async ({ page, context }) => {
+test('the card body is never crushed — the description and form are visible', async ({ page }) => {
+  // Regression for Billy's phone: `flex: 1` (0% basis) on the body let an
+  // older WebKit collapse the auto-height column card to head + foot with one
+  // clipped line of text between them. Chromium never showed it; assert the
+  // rendered body matches its content height on every engine we run.
+  await openSync(page);
+  const body = page.locator('#sync-dialog .sheet-body');
+  const rendered = (await body.boundingBox())!.height;
+  const content = await body.evaluate((n) => n.scrollHeight);
+  expect(rendered).toBeGreaterThanOrEqual(content - 1);
+  await expect(page.locator('#sync-email')).toBeInViewport();
+});
+
+test('pinch/auto-zoom must not read as a keyboard', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'page-scale emulation is CDP-only');
   // Regression: iOS auto-zoom (and pinch) shrinks visualViewport.height with
   // no keyboard on screen. measure() once turned that into a huge phantom
   // inset that outlived the zoom — sheets stayed crushed and lifted forever.

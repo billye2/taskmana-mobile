@@ -1,6 +1,6 @@
 {
   "name": "taskmana",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "private": true,
   "description": "Personal mobile-first task web app (PWA). No build step — dev tooling is for tests and typechecking only.",
   "scripts": {

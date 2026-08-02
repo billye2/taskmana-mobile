@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
 
@@ -8,6 +8,9 @@ export default defineConfig({
   // Baselines are rendered on macOS; on CI (Linux) run the visual tests'
   // flows but skip pixel comparison.
   ignoreSnapshots: !!process.env.CI,
+  // Keep the pre-projects snapshot names (no project-name segment) — only the
+  // chromium project takes screenshots.
+  snapshotPathTemplate: '{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{platform}{ext}',
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.02 },
   },
@@ -20,4 +23,16 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}/`,
     viewport: { width: 900, height: 900 },
   },
+  projects: [
+    { name: 'chromium' },
+    // Billy's phone is an iPhone: every engine-family bug so far (crushed
+    // dialog cards) shipped because the suite only ran Blink. The mobile
+    // layout specs re-run on real WebKit; browserName must be set here or the
+    // specs' own defaultBrowserType would silently pull them back to Blink.
+    {
+      name: 'mobile-webkit',
+      testMatch: /sheets|touch/,
+      use: { ...devices['iPhone 14'], browserName: 'webkit' },
+    },
+  ],
 });

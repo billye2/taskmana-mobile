@@ -14,3 +14,8 @@ console.log(`package.json: -> ${next}`);
 const sw = readFileSync('sw.js', 'utf8');
 writeFileSync('sw.js', sw.replace(/const VERSION = '[^']+';/, `const VERSION = '${next}';`));
 console.log(`sw.js: -> ${next}`);
+
+// The visible version line in More, so a phone can report what it runs.
+const html = readFileSync('index.html', 'utf8');
+writeFileSync('index.html', html.replace(/Version [0-9.]+</, `Version ${next}<`));
+console.log(`index.html: -> ${next}`);
