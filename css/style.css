@@ -1075,7 +1075,13 @@ body.hints-off .hint {
   margin: auto auto 0; /* bottom-anchored instead of centred */
   width: 100%;
   max-width: none;
-  max-height: 92dvh;
+  /* Lift clear of the soft keyboard and shrink to fit what's left. Without
+     this the sheet stays pinned to the layout viewport — which iOS does not
+     shrink for the keyboard — and its form fields sit behind it. Scrolling
+     the body can't rescue them: a short sheet has nothing to scroll. */
+  max-height: min(92dvh, calc(100dvh - var(--kb-inset, 0px) - 16px));
+  transform: translateY(calc(-1 * var(--kb-inset, 0px)));
+  transition: transform 0.15s ease-out;
   border: none;
   border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
   padding: 0;
@@ -1125,7 +1131,9 @@ body.hints-off .hint {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 0 20px calc(16px + var(--kb-inset, 0px));
+  /* No keyboard padding here — the whole sheet already moves up by the inset,
+     and adding it again would push the content off the top. */
+  padding: 0 20px 16px;
 }
 
 .sheet-foot {
@@ -1144,6 +1152,12 @@ body.hints-off .hint {
   gap: 8px;
 }
 
+/* The home-indicator inset is dead space once the sheet has been lifted clear
+   of the keyboard — the indicator is behind the keyboard, not the sheet. */
+body.kb-open .sheet-foot {
+  padding-bottom: 12px;
+}
+
 /* Stops the page behind a sheet from rubber-banding on iOS. */
 body:has(dialog[open]) {
   overflow: hidden;
@@ -1155,8 +1169,10 @@ body:has(dialog[open]) {
      works identically, which is why there's no JS fallback. */
   .sheet {
     translate: 0 100%;
-    transition: translate 0.28s cubic-bezier(0.32, 0.72, 0, 1), overlay 0.28s allow-discrete,
-      display 0.28s allow-discrete;
+    /* transform is in the list too: this rule replaces the base transition,
+       and dropping it would make the keyboard lift snap instead of glide. */
+    transition: translate 0.28s cubic-bezier(0.32, 0.72, 0, 1), transform 0.15s ease-out,
+      overlay 0.28s allow-discrete, display 0.28s allow-discrete;
   }
 
   .sheet[open] {

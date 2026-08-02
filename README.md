@@ -77,7 +77,8 @@ npm install
 npm run typecheck   # TypeScript strict mode over the JS source (checkJs + JSDoc)
 npm run test:unit   # node:test unit tests for model logic + sync merge (46 tests)
 npm run test:e2e    # Playwright over http + touch emulation: e2e, tab routing,
-                    # swipe gestures, axe a11y, 44px targets, visual regression (38 tests)
+                    # swipe gestures, sheets + keyboard insets, axe a11y,
+                    # 44px targets, visual regression (42 tests)
 npm test            # all of the above
 ```
 
@@ -101,5 +102,5 @@ Gotchas learned the hard way (preserved here so they aren't relearned):
 - An inline `style.display` beats any `body[data-view]` rule, so hiding an empty section that way blanks a whole tab. Toggle a class or `hidden` on an inner wrapper instead.
 - A gesture is always followed by a `click` on whatever was under the finger. Since tapping task text opens the editor, every swipe would leave an open field behind — `js/swipe.js` swallows that click in the capture phase.
 - `touch-action: pan-y` on a swipeable row (never `none`) keeps vertical scrolling on the compositor while leaving the horizontal axis to JS.
-- iOS Safari doesn't resize the layout viewport for the keyboard, and `env(keyboard-inset-height)` is Chromium-only — `visualViewport` (`resize` **and** `scroll`) is the only way to keep a fixed bottom bar above it.
+- iOS Safari doesn't resize the layout viewport for the keyboard, and `env(keyboard-inset-height)` is Chromium-only — `visualViewport` (`resize` **and** `scroll`) is the only way to keep a fixed bottom bar above it. This applies to **bottom sheets too**, not just the dock: a bottom-anchored `<dialog>` stays pinned to the layout viewport and its form fields end up behind the keyboard. Scrolling `.sheet-body` can't rescue them — a short sheet has nothing to scroll — so the sheet itself translates up by `--kb-inset` and caps its height to what's left.
 - `cache.addAll()` in a service worker is all-or-nothing: one bad path aborts the install and the app is silently never offline-capable. `sw.js` uses `Promise.allSettled` over individual `cache.add()` calls.
