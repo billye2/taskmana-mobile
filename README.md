@@ -16,7 +16,7 @@ Theme: **More → Appearance** forces Light or Dark, or follows your system appe
 
 Mobile is the base layout; the desktop column is a `@media (min-width: 768px)` enhancement — the only width breakpoint in the stylesheet.
 
-On a phone there are four tabs — **Today · Inbox · Someday · More** — over a fixed dock holding the capture bar and the tab bar. The active tab lives in the URL hash, so Android Back and iOS edge-swipe return to the previous tab instead of leaving the app, and `#inbox` is a working deep link. Capture is always one tap away (except on More, which is settings), and files to the Inbox from anywhere — a toast says so and offers to promote to Today. Dialogs present as bottom sheets.
+On a phone there are four tabs — **Today · Inbox · Someday · More** — over a fixed dock holding the capture bar and the tab bar. The active tab lives in the URL hash, so Android Back and iOS edge-swipe return to the previous tab instead of leaving the app, and `#inbox` is a working deep link. Capture is always one tap away (except on More, which is settings), and files to the Inbox from anywhere — a toast says so and offers to promote to Today. Dialogs present as top sheets — dropped from the top edge, where the soft keyboard can never cover them.
 
 Rows swipe: **right is constructive, left removes.** Inbox → Today / Drop, Today → Done / back to Inbox, Someday → Inbox / Drop, Recycle → Restore. Anything destructive raises an Undo toast. Swipe is only ever an accelerator: the same actions are on every row's `⋯` sheet, and a test asserts that structurally.
 

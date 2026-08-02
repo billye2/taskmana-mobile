@@ -16,14 +16,17 @@ to that repo, so pushes to `main` deploy automatically.
   untouched and keeps the extension's history.
 - **Mobile-first shell.** Touch is the base layout; `@media (min-width: 768px)`
   is the only width breakpoint and restores the old single-page desktop column.
-  Four tabs over a fixed dock, hash routing, bottom sheets, swipe rows with
+  Four tabs over a fixed dock, hash routing, top sheets, swipe rows with
   Undo, per-row `⋯` action sheet, in-app toast and confirm replacing
   `alert()`/`confirm()`.
 - **Three real service-worker bugs fixed** — see the README gotchas. The worst:
   `ASSETS` omitted `js/config.js` and `js/sync.js`, so an offline cold start
   booted a blank page.
-- **Keyboard handling.** Dock, sheets and the inline editor all stay clear of
-  the soft keyboard via `visualViewport`.
+- **Keyboard handling.** The dock and inline editor stay clear of the soft
+  keyboard via `visualViewport`; sheets anchor to the top edge and don't need
+  it. `measure()` guards against pinch/auto-zoom and `applyInset()` clamps —
+  on-device iOS produced phantom insets that crushed every sheet (see the
+  regression tests in `sheets.spec.ts`).
 - **Supabase.** `taskmana_states` + RLS created, `js/config.js` filled,
   `js/sync.js` pointed at the prefixed table.
 - Tests 24 → 46, all passing. Visual baselines regenerated.

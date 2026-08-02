@@ -1064,7 +1064,7 @@ body.hints-off .hint {
   backdrop-filter: blur(2px);
 }
 
-/* ---- bottom sheets (mobile presentation of the dialogs) ---- */
+/* ---- top sheets (mobile presentation of the dialogs) ---- */
 
 /* The [open] qualifier is load-bearing: an unqualified author `display` beats
    the UA's `dialog:not([open]) { display: none }` and every sheet would render
@@ -1075,28 +1075,32 @@ body.hints-off .hint {
 }
 
 .sheet {
-  margin: auto auto 0; /* bottom-anchored instead of centred */
+  /* Top-anchored: the soft keyboard owns the bottom of the screen, so sheets
+     drop from the top edge where nothing can cover their form fields. The
+     max-height still subtracts the keyboard inset so a tall sheet can't run
+     underneath it — iOS never shrinks the layout viewport for the keyboard. */
+  margin: 0 auto auto;
   width: 100%;
   max-width: none;
-  /* Lift clear of the soft keyboard and shrink to fit what's left. Without
-     this the sheet stays pinned to the layout viewport — which iOS does not
-     shrink for the keyboard — and its form fields sit behind it. Scrolling
-     the body can't rescue them: a short sheet has nothing to scroll. */
-  max-height: min(92dvh, calc(100dvh - var(--kb-inset, 0px) - 16px));
-  transform: translateY(calc(-1 * var(--kb-inset, 0px)));
-  transition: transform 0.15s ease-out;
+  /* The max() floor keeps a sheet usable even if --kb-inset goes bad — a
+     stale visualViewport reading must degrade to "scroll the body", never to
+     a sheet crushed to its header. */
+  max-height: min(92dvh, max(280px, calc(100dvh - var(--kb-inset, 0px) - 16px)));
   border: none;
-  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
-  padding: 0;
+  border-radius: 0 0 var(--sheet-radius) var(--sheet-radius);
+  padding: env(safe-area-inset-top) 0 0;
 }
 
 .sheet-grab {
   flex: none;
+  /* Markup keeps the grab first (it predates the top-anchoring); order moves
+     it to the sheet's free bottom edge, matching the pull direction. */
+  order: 1;
   width: 36px;
   height: 4px;
   border-radius: 999px;
   background: var(--border-strong);
-  margin: 8px auto 4px;
+  margin: 4px auto 8px;
 }
 
 .sheet-head {
@@ -1145,7 +1149,7 @@ body.hints-off .hint {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px 20px;
   border-top: 1px solid var(--border);
 }
 
@@ -1153,12 +1157,6 @@ body.hints-off .hint {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* The home-indicator inset is dead space once the sheet has been lifted clear
-   of the keyboard — the indicator is behind the keyboard, not the sheet. */
-body.kb-open .sheet-foot {
-  padding-bottom: 12px;
 }
 
 /* Stops the page behind a sheet from rubber-banding on iOS. */
@@ -1171,10 +1169,8 @@ body:has(dialog[open]) {
      layer. Chrome 117+ / Safari 17.4+; older engines get an instant sheet that
      works identically, which is why there's no JS fallback. */
   .sheet {
-    translate: 0 100%;
-    /* transform is in the list too: this rule replaces the base transition,
-       and dropping it would make the keyboard lift snap instead of glide. */
-    transition: translate 0.28s cubic-bezier(0.32, 0.72, 0, 1), transform 0.15s ease-out,
+    translate: 0 -100%;
+    transition: translate 0.28s cubic-bezier(0.32, 0.72, 0, 1),
       overlay 0.28s allow-discrete, display 0.28s allow-discrete;
   }
 
@@ -1184,7 +1180,7 @@ body:has(dialog[open]) {
 
   @starting-style {
     .sheet[open] {
-      translate: 0 100%;
+      translate: 0 -100%;
     }
   }
 

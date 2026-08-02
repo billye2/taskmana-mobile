@@ -1,4 +1,4 @@
-// Bottom sheets. Mobile emulation — at >=768px these present as centred
+// Top sheets. Mobile emulation — at >=768px these present as centred
 // modals and the keyboard behaviour below doesn't apply.
 import { test, expect, devices } from '@playwright/test';
 
@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.waitForFunction(() => !!document.getElementById('date-line')?.textContent);
 });
 
-/** Wait out the slide-up (or the keyboard lift) before measuring anything. */
+/** Wait out the slide-down before measuring anything. */
 async function settle(locator: import('@playwright/test').Locator) {
   await locator.evaluate(async (n) => {
     await Promise.all(n.getAnimations().map((a) => a.finished.catch(() => {})));
@@ -33,27 +33,57 @@ async function fakeKeyboard(page: import('@playwright/test').Page, px: number) {
   await page.evaluate(`TaskmanaViewport.applyInset(${px})`);
 }
 
-test('sheet form fields stay above the keyboard', async ({ page }) => {
+test('sheets anchor to the top, clear of any keyboard', async ({ page }) => {
   await openSync(page);
   const field = page.locator('#sync-email');
   const viewportH = page.viewportSize()!.height;
 
-  const before = (await field.boundingBox())!;
-  expect(before.y + before.height).toBeLessThan(viewportH);
+  // Top-anchored: the keyboard owns the bottom of the screen, so the sheet
+  // starts at the top edge instead of lifting itself out of the way.
+  const before = (await page.locator('#sync-dialog').boundingBox())!;
+  expect(before.y).toBeLessThanOrEqual(1);
 
-  // A typical iPhone keyboard. Without the sheet lifting, the field sits
-  // behind it — the sheet is bottom-anchored and iOS never shrinks the
-  // layout viewport for the keyboard.
   const kb = 300;
   await fakeKeyboard(page, kb);
   await settle(page.locator('#sync-dialog'));
 
   const after = (await field.boundingBox())!;
+  expect(after.y).toBeGreaterThanOrEqual(0);
   expect(after.y + after.height).toBeLessThanOrEqual(viewportH - kb);
+});
 
-  // and the sheet must not have been pushed off the top to achieve it
+test('pinch/auto-zoom must not read as a keyboard', async ({ page, context }) => {
+  // Regression: iOS auto-zoom (and pinch) shrinks visualViewport.height with
+  // no keyboard on screen. measure() once turned that into a huge phantom
+  // inset that outlived the zoom — sheets stayed crushed and lifted forever.
+  await openSync(page);
+  const client = await context.newCDPSession(page);
+  await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
+  await page.evaluate('TaskmanaViewport.applyInset(TaskmanaViewport.measure())');
+
+  const inset = await page.evaluate(
+    'getComputedStyle(document.documentElement).getPropertyValue("--kb-inset").trim()'
+  );
+  expect(inset).toBe('0px');
+  await client.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+});
+
+test('a garbage keyboard inset cannot crush a sheet', async ({ page }) => {
+  // Regression: on-device iOS left visualViewport offset/zoomed after a
+  // keyboard dismissal, measure() reported a huge phantom keyboard with none
+  // on screen, and every sheet collapsed to its header — the body (and the
+  // sync email form with it) was squeezed out entirely.
+  await openSync(page);
+  await fakeKeyboard(page, 2000); // far larger than any real keyboard
+  await settle(page.locator('#sync-dialog'));
+
   const sheet = (await page.locator('#sync-dialog').boundingBox())!;
-  expect(sheet.y).toBeGreaterThanOrEqual(0);
+  expect(sheet.height).toBeGreaterThanOrEqual(240);
+
+  // the form the user came for is still on screen and usable
+  const field = (await page.locator('#sync-email').boundingBox())!;
+  expect(field.y).toBeGreaterThanOrEqual(0);
+  expect(field.y + field.height).toBeLessThanOrEqual(page.viewportSize()!.height);
 });
 
 test('the dock also clears the keyboard, and hides the tab bar for room', async ({ page }) => {
@@ -79,10 +109,12 @@ test('Escape, the close button, and a backdrop tap all dismiss a sheet', async (
   await expect(dlg).toBeHidden();
 
   // Backdrop: a <dialog> doesn't do this natively, so it's hand-rolled.
+  // The sheet hangs from the top, so the backdrop is the area below it.
   await page.locator('#sync-btn').tap();
   await expect(dlg).toBeVisible();
   const box = (await dlg.boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, Math.max(4, box.y - 60));
+  const viewportH = page.viewportSize()!.height;
+  await page.mouse.click(box.x + box.width / 2, Math.min(viewportH - 4, box.y + box.height + 60));
   await expect(dlg).toBeHidden();
 });
 

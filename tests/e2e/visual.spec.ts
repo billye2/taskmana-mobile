@@ -41,6 +41,39 @@ for (const scheme of ['light', 'dark'] as const) {
   });
 }
 
+// The >=768px block presents dialogs as centred modals, so the desktop shots
+// above never see the mobile sheet at all — these do. The keyboard variant is
+// the state that shipped broken twice: measured geometry passed while the
+// visual result was a sheet crushed to its header.
+test.describe('mobile sheets', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('sync sheet visual — mobile', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await writeStateAndReload(page, seed);
+    await page.locator('.tab[data-view="more"]').tap();
+    await page.locator('#sync-btn').tap();
+    await expect(page.locator('#sync-dialog')).toBeVisible();
+    await page.waitForTimeout(400); // slide-down
+    await expect(page).toHaveScreenshot('sync-sheet-mobile.png', {
+      mask: [page.locator('#date-line')],
+    });
+  });
+
+  test('sync sheet visual — mobile, keyboard up', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await writeStateAndReload(page, seed);
+    await page.locator('.tab[data-view="more"]').tap();
+    await page.locator('#sync-btn').tap();
+    await expect(page.locator('#sync-dialog')).toBeVisible();
+    await page.evaluate('TaskmanaViewport.applyInset(300)');
+    await page.waitForTimeout(400);
+    await expect(page).toHaveScreenshot('sync-sheet-mobile-kb.png', {
+      mask: [page.locator('#date-line')],
+    });
+  });
+});
+
 test('plan-tomorrow dialog visual', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await writeStateAndReload(page, seed);
