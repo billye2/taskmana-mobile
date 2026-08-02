@@ -152,16 +152,37 @@ function editableText(task) {
     const input = el('input', 'edit-input');
     input.value = task.text;
     input.setAttribute('aria-label', 'Edit task');
+    input.enterKeyHint = 'done';
     span.replaceWith(input);
     input.focus();
     input.select();
+
+    // Enter commits, then the re-render tears the input out — which can fire
+    // blur and commit a second time. Escape has the same problem in reverse:
+    // its render() would blur into a commit and save the very edit it meant
+    // to discard. One latch settles both.
+    let settled = false;
     const commit = async () => {
+      if (settled) return;
+      settled = true;
       M.editTask(state, task.id, input.value);
       await persistAndRender();
     };
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
+      render();
+    };
+
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') commit();
-      if (e.key === 'Escape') render();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancel();
+      }
     });
     input.addEventListener('blur', commit);
   };

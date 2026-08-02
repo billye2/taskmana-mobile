@@ -113,7 +113,10 @@ body {
 .page {
   padding-left: max(16px, env(safe-area-inset-left));
   padding-right: max(16px, env(safe-area-inset-right));
-  padding-bottom: calc(var(--dock-h) + env(safe-area-inset-bottom) + 24px);
+  /* The keyboard term matters: the dock rides up by --kb-inset, so without it
+     the last rows of a long list sit under the dock with nothing left to
+     scroll. */
+  padding-bottom: calc(var(--dock-h) + var(--kb-inset, 0px) + env(safe-area-inset-bottom) + 24px);
 }
 
 /* ---- views ---- */
