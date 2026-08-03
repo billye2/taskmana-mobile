@@ -1,4 +1,4 @@
-import { test, expect, capture, readState, writeStateAndReload, localDate } from './fixtures';
+import { test, expect, capture, readState, writeStateAndReload, localDate, openSettings } from './fixtures';
 
 test('app loads and captured tasks persist across reload', async ({ page }) => {
   await capture(page, 'buy milk');
@@ -138,6 +138,7 @@ test('previous-days history is collapsed under the footer and expands on demand'
     });
   });
 
+  await openSettings(page);
   const section = page.locator('#history-section');
   await expect(section).toBeVisible();
   await expect(page.locator('#history-body .task .text')).toBeHidden(); // collapsed by default
@@ -147,6 +148,7 @@ test('previous-days history is collapsed under the footer and expands on demand'
 
   // open state survives a re-render (completing a task triggers one)
   await capture(page, 'still open?');
+  await openSettings(page); // capturing clicked outside, which closes the popover
   await expect(page.locator('#history-body .task .text')).toBeVisible();
 });
 
@@ -156,6 +158,7 @@ test('method hints name their authors and can be toggled off', async ({ page }) 
   await expect(page.locator('#today-section .hint').first()).toContainText('Ivy Lee');
   await expect(page.locator('#today-section .hint').first()).toContainText('Ryder Carroll');
   await expect(page.locator('#inbox-section .hint').first()).toContainText('David Allen');
+  await openSettings(page);
   await expect(page.locator('#recycle-section .hint')).toContainText('30 days');
   await page.locator('#hints-toggle').click();
   await expect(hints.nth(0)).toBeHidden();
@@ -177,6 +180,7 @@ test('hint examples cycle through and wrap around', async ({ page }) => {
   // every section has examples, and they hide with the hints toggle
   await expect(page.locator('.hint-example[data-section="inbox"] .example-text')).toContainText('(1/4)');
   await expect(page.locator('.hint-example[data-section="someday"] .example-text')).toContainText('(1/3)');
+  await openSettings(page);
   await page.locator('#hints-toggle').click();
   await expect(todayExample).toBeHidden();
 });
@@ -197,6 +201,7 @@ test('review and plan dialogs have cyclable examples that follow the hints toggl
   await page.locator('#review-close').click();
 
   // hints off hides dialog examples too
+  await openSettings(page);
   await page.locator('#hints-toggle').click();
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(planExample).toBeHidden();
@@ -206,6 +211,7 @@ test('export downloads a dated backup and import restores it', async ({ page }) 
   await capture(page, 'irreplaceable task');
   await capture(page, 'another keeper');
 
+  await openSettings(page);
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.locator('#export-btn').click(),
@@ -259,6 +265,7 @@ test('import rejects invalid files and cancel leaves data untouched', async ({ p
 test('sync dialog opens signed-out at the email step without touching the network', async ({
   page,
 }) => {
+  await openSettings(page);
   await page.locator('#sync-btn').click();
   const dialog = page.locator('#sync-dialog');
   await expect(dialog).toBeVisible();
@@ -276,6 +283,7 @@ test('sync dialog opens signed-out at the email step without touching the networ
 test('theme selector forces light and dark regardless of system scheme', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   const seg = (name: string) => page.locator(`#theme-select .seg[data-theme="${name}"]`);
+  await openSettings(page);
   await expect(seg('system')).toHaveClass(/active/);
 
   await seg('light').click();
@@ -293,7 +301,9 @@ test('theme selector forces light and dark regardless of system scheme', async (
 test('dropped tasks land in the recycle bin and can be restored to the inbox', async ({ page }) => {
   await capture(page, 'keep me');
   await capture(page, 'oops');
+  await openSettings(page);
   await expect(page.locator('#recycle-section')).toBeHidden();
+  await page.keyboard.press('Escape'); // the popover covers the inbox rows
 
   await page
     .locator('#inbox-list .task', { hasText: 'oops' })
@@ -301,6 +311,7 @@ test('dropped tasks land in the recycle bin and can be restored to the inbox', a
     .click();
   await expect(page.locator('#inbox-list .task .text')).toHaveText(['keep me']);
 
+  await openSettings(page); // the drop click closed the popover
   const recycle = page.locator('#recycle-section');
   await expect(recycle).toBeVisible();
   await expect(page.locator('#recycle-count')).toHaveText('1');

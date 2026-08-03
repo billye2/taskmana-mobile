@@ -1621,6 +1621,35 @@ body:has(dialog[open]) {
     display: inline-flex;
   }
 
+  /* Settings live behind the ⚙ chip, not at the bottom of the page. The
+     section node stays where the mobile shell needs it; here it presents as
+     a popover anchored under the masthead's right edge. */
+  #more-section {
+    display: none;
+  }
+
+  body.more-open #more-section {
+    display: block;
+    position: fixed;
+    top: calc(8vh + 52px);
+    right: max(24px, calc((100vw - 640px) / 2));
+    width: 400px;
+    max-height: 72vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: var(--shadow-md);
+    padding: 18px 20px;
+    z-index: 30;
+  }
+
+  /* The ⚙ chip is the title; "More" inside the popover would be noise. */
+  body.more-open #more-section .section-head {
+    display: none;
+  }
+
   /* Back to a centred modal, not a sheet. */
   .sheet {
     margin: auto;

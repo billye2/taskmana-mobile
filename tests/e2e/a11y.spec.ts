@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { test, expect, capture, writeStateAndReload, localDate } from './fixtures';
+import { test, expect, capture, writeStateAndReload, localDate, openSettings } from './fixtures';
 
 async function expectNoViolations(page: import('@playwright/test').Page) {
   // Park the pointer off every row and let the fade settle first. A re-render
@@ -57,6 +57,7 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
   });
 
   test('sync dialog', async ({ page }) => {
+    await openSettings(page);
     await page.locator('#sync-btn').click();
     await expect(page.locator('#sync-dialog')).toBeVisible();
     await expectNoViolations(page);
@@ -76,6 +77,7 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
         completedOn: localDate(1),
       });
     });
+    await openSettings(page);
     await page.locator('#history-section summary').click();
     await expect(page.locator('#history-body .task .text')).toBeVisible();
     await expectNoViolations(page);

@@ -39,6 +39,18 @@ export async function rowAction(
   await row.getByRole('button', { name: actionName }).click();
 }
 
+/**
+ * Desktop hides the More section behind the masthead's ⚙ chip; open it so its
+ * controls (sync, backup, theme, hints, recycle, history) are clickable. Any
+ * click outside the popover closes it, so call again after page interactions.
+ * On mobile the chip doesn't render and More is a tab — no-op there.
+ */
+export async function openSettings(page: import('@playwright/test').Page) {
+  const gear = page.locator('#settings-btn');
+  if (!(await gear.isVisible())) return;
+  if ((await gear.getAttribute('aria-expanded')) !== 'true') await gear.click();
+}
+
 /** Read the persisted state straight from localStorage. */
 export function readState(page: import('@playwright/test').Page): Promise<any> {
   return page.evaluate((k) => {

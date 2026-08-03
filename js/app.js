@@ -688,6 +688,31 @@ $('hints-toggle').addEventListener('click', async () => {
   await persistAndRender();
 });
 
+// Desktop settings popover: the ⚙ chip presents the More section as a panel
+// anchored under the masthead instead of a dump at the bottom of the page.
+// Mobile never shows the chip — the More tab owns that surface there.
+{
+  const btn = $('settings-btn');
+  const close = () => {
+    document.body.classList.remove('more-open');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = document.body.classList.toggle('more-open');
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', (e) => {
+    if (!document.body.classList.contains('more-open')) return;
+    const t = e.target;
+    if (t instanceof Element && t.closest('#more-section, #settings-btn')) return;
+    close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('more-open')) close();
+  });
+}
+
 // ---- view routing -----------------------------------------------------------
 
 // Delegated: one listener on the bar rather than four on buttons.

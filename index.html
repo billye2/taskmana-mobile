@@ -25,6 +25,10 @@
       <button id="focus-toggle" class="chip" title="Ivy Lee focus: work tasks strictly in order">Focus</button>
       <button id="plan-btn" class="chip" title="End your day: choose tomorrow's tasks in order">Plan</button>
       <button id="review-btn" class="chip" title="Weekly review: sort your inbox and stale tasks">Review<span id="review-badge" class="badge" hidden></span></button>
+      <!-- Desktop-only (chips are revealed by the >=768px block; mobile keeps
+           the More tab): opens the settings popover instead of rendering the
+           whole More section at the bottom of the page. -->
+      <button id="settings-btn" class="chip" title="Backup, sync &amp; settings" aria-label="Backup, sync and settings" aria-controls="more-section" aria-expanded="false">⚙</button>
     </div>
   </header>
 
@@ -125,7 +129,7 @@
 
       <!-- Stamped by scripts/bump-version.mjs; answers "which release is this
            phone actually running" without DevTools. -->
-      <p class="more-note" id="version-line">Version 2.2.1</p>
+      <p class="more-note" id="version-line">Version 2.2.2</p>
     </section>
   </main>
 
