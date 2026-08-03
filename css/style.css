@@ -1553,52 +1553,65 @@ body:has(dialog[open]) {
    centred reading column for a laptop. */
 
 @media (min-width: 768px) {
-  /* A monitor is a workspace, not a stretched phone: the three lists sit in
-     side-by-side columns (the promote/demote flow reads left-to-right), and
-     the settings live below. auto-fit collapses to two columns, then one, as
-     the window narrows. */
-  .page {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 24px 24px calc(var(--dock-h) + 40px);
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 20px;
-    align-items: start;
+  /* The extension's new-tab layout, faithfully: date masthead, capture bar
+     right under it, then one calm 640px column of sections. The DOM stays
+     mobile-first (capture lives in the dock element); flex order moves the
+     dock up between the masthead and the page. */
+  body {
+    display: flex;
+    flex-direction: column;
   }
 
-  /* No tabs on a laptop: every section is on the page at once. */
+  .appbar {
+    order: 1;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 8vh 24px 16px;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    position: static;
+  }
+
+  .bottom-dock {
+    order: 2;
+    position: static;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 8px 24px 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    transform: none;
+  }
+
+  .page {
+    order: 3;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* No tabs on a laptop: every section is on the page at once, the way the
+     new-tab page always was. */
   .view {
     display: block;
-    min-width: 0;
   }
 
-  .view.section {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 20px 20px;
-  }
-
-  /* Settings read better narrow — centred under the columns. */
-  #more-section {
-    grid-column: 1 / -1;
-    width: 100%;
-    max-width: 680px;
-    justify-self: center;
+  .view + .view {
+    margin-top: 28px;
   }
 
   .tabbar {
     display: none;
   }
 
-  .appbar {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 6vh 24px 20px;
-    background: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    position: static;
+  .capture {
+    margin-bottom: 24px;
   }
 
   .appbar-actions .chip,
@@ -1606,19 +1619,6 @@ body:has(dialog[open]) {
   body[data-view="today"] #plan-btn,
   body[data-view="inbox"] #review-btn {
     display: inline-flex;
-  }
-
-  .bottom-dock {
-    max-width: 640px;
-    margin: 0 auto;
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    padding: 10px 16px;
-  }
-
-  .capture {
-    margin-bottom: 0;
   }
 
   /* Back to a centred modal, not a sheet. */

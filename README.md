@@ -20,7 +20,7 @@ On a phone there are four tabs — **Today · Inbox · Someday · More** — ove
 
 Every row action is a visible button on the row — no overflow menu. Inbox: **Today / Someday / ✕**, Today: **checkbox / ↑ / ↓ / Inbox**, Someday: **Inbox / ✕**, Recycle: **Restore**. Rows also swipe as an accelerator: **right is constructive, left removes**, mirroring the buttons. Anything destructive raises an Undo toast, and a test asserts every swipe action exists as a button structurally.
 
-At ≥768px the tab bar disappears and the page becomes a workspace: Today, Inbox, and Someday sit in side-by-side columns (collapsing to two, then one, as the window narrows), settings centre below them, dialogs become centred modals, and row actions stay visible — no hover-reveal.
+At ≥768px the layout is the old extension's new-tab page, faithfully: date masthead with chips, the capture bar directly under it, then a single centred 640px column of sections with settings at the bottom. The tab bar disappears, dialogs become centred modals, and row actions stay visible — no hover-reveal. (The DOM stays mobile-first; flex `order` moves the capture dock up.)
 
 ## Install
 
