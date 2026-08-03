@@ -519,7 +519,9 @@ body.hints-off .hint {
 }
 
 #today-list .swipe-fg {
-  padding: 5px 14px;
+  /* Right side hugs the action cluster — its outermost tap box already
+     carries its own slack. */
+  padding: 5px 8px 5px 14px;
 }
 
 #today-list .task + .task,
@@ -710,8 +712,20 @@ body.hints-off .hint {
    by the checkbox, reordering hidden on done rows as noise). */
 .task .actions {
   display: flex;
-  gap: 1px;
+  gap: 0;
   transition: opacity 0.1s;
+}
+
+/* Squeeze the cluster: the 44px tap boxes stay (the touch test enforces
+   them), but the glyphs are small and centred, so trimming padding and
+   overlapping the boxes' dead outer edges buys the task text ~25px without
+   shrinking any target below the floor. */
+.task .actions .icon-btn {
+  padding: 0 3px;
+}
+
+.task .actions .icon-btn + .icon-btn {
+  margin-left: -6px;
 }
 
 .task .actions .icon-btn:not(.primary) {
