@@ -292,7 +292,10 @@ function rowActions(task, kind, ctx) {
         undo: () => M.demoteToInbox(state, task.id),
       },
       {
-        label: 'Someday',
+        // "SD" on touch: next to "Today" inside the squeezed 44px tap boxes,
+        // the two full words read as one run of text. The accessible name
+        // below stays "Park in Someday" either way.
+        label: coarsePointer ? 'SD' : 'Someday',
         title: `Park in Someday: ${task.text}`,
         primary: true,
         undoneMessage: 'Parked in Someday',
