@@ -34,36 +34,47 @@ test('touch: actions are visible without hover and a single tap edits', async ({
   await expect(page.locator('.edit-input')).toHaveCount(0);
 });
 
-test('touch: each list\'s key actions are visible buttons, not just swipes', async ({ page }) => {
+test('touch: every action is a visible button on its row — no overflow menu', async ({ page }) => {
   // Swiping never announces itself — the actions Billy actually reaches for
-  // (add to Today, Drop, …) must be real buttons on the row.
+  // must be real buttons on the row, with no ⋯ hiding any of them.
   await page.locator('#capture-input').fill('button row');
   await page.locator('#capture-input').press('Enter');
   await page.locator('.tab[data-view="inbox"]').tap();
   const row = page.locator('#inbox-list .task', { hasText: 'button row' });
 
-  // The primary pair is on the row; Someday stays behind the overflow button.
   await expect(row.getByRole('button', { name: /Add to today/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: /Park in Someday/ })).toBeVisible();
   await expect(row.getByRole('button', { name: /^Drop/ })).toBeVisible();
-  await expect(row.getByRole('button', { name: /Park in Someday/ })).toBeHidden();
-  await expect(row.getByRole('button', { name: /Actions for/ })).toBeVisible();
+  await expect(page.locator('.row-more')).toHaveCount(0);
 
-  // The visible button actually does the thing.
+  // Today rows: checkbox for done, then reorder arrows as visible buttons.
   await row.getByRole('button', { name: /Add to today/ }).tap();
-  await expect(page.locator('#today-list .task .text')).toHaveText('button row');
-
-  // A Someday row's actions are all primary, so it earns no overflow button.
-  await page.locator('#capture-input').fill('parked');
+  await page.locator('#capture-input').fill('second');
   await page.locator('#capture-input').press('Enter');
+  await page.getByRole('button', { name: 'Add to Today' }).tap(); // toast shortcut
+  await page.locator('.tab[data-view="today"]').tap();
+  const todayRow = page.locator('#today-list .task', { hasText: 'second' });
+  await expect(todayRow.getByRole('checkbox')).toBeVisible();
+  await expect(todayRow.getByRole('button', { name: /Move up/ })).toBeVisible();
+  await expect(todayRow.getByRole('button', { name: /Move down/ })).toBeVisible();
+
+  // The arrows actually reorder.
+  await todayRow.getByRole('button', { name: /Move up/ }).tap();
+  await expect(page.locator('#today-list .task .text').first()).toHaveText('second');
+
+  // Someday rows show their pair too.
+  await page.locator('.tab[data-view="today"]').tap();
+  const first = page.locator('#today-list .task', { hasText: 'button row' });
+  await first.getByRole('button', { name: /Send back to inbox/ }).tap();
   await page.locator('.tab[data-view="inbox"]').tap();
-  const parked = page.locator('#inbox-list .task', { hasText: 'parked' });
-  await parked.getByRole('button', { name: /Actions for/ }).tap();
-  await page.getByRole('button', { name: /Park in Someday/ }).tap();
+  await page
+    .locator('#inbox-list .task', { hasText: 'button row' })
+    .getByRole('button', { name: /Park in Someday/ })
+    .tap();
   await page.locator('.tab[data-view="someday"]').tap();
-  const somedayRow = page.locator('#someday-list .task', { hasText: 'parked' });
+  const somedayRow = page.locator('#someday-list .task', { hasText: 'button row' });
   await expect(somedayRow.getByRole('button', { name: /Move back to inbox/ })).toBeVisible();
   await expect(somedayRow.getByRole('button', { name: /^Drop/ })).toBeVisible();
-  await expect(somedayRow.getByRole('button', { name: /Actions for/ })).toBeHidden();
 });
 
 test('touch: the Add button captures the field', async ({ page }) => {

@@ -40,7 +40,9 @@ async function drag(
   await expect(row).toBeVisible();
   const box = (await row.boundingBox())!;
   const y = box.y + box.height / 2;
-  const x = box.x + box.width / 2;
+  // Start over the task text: the row's centre can land on the inline action
+  // buttons, and swipe.js deliberately ignores drags that start on a button.
+  const x = box.x + Math.min(60, box.width / 4);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + dx, y + dy, { steps: 12 });
@@ -101,6 +103,7 @@ test('a swipe does not leave the inline editor open behind it', async ({ page })
 
 test('every swipe action is also reachable as a button', async ({ page }) => {
   // The structural guarantee: gestures are an accelerator, never the only way.
+  // There is no overflow menu — the buttons live on the row itself.
   await seed(page, 'reachable');
   const row = page.locator('#inbox-list .task', { hasText: 'reachable' });
 
@@ -109,11 +112,9 @@ test('every swipe action is also reachable as a button', async ({ page }) => {
     .evaluateAll((nodes) => nodes.map((n) => n.textContent?.trim()).filter(Boolean));
   expect(swipeLabels.length).toBeGreaterThan(0);
 
-  await row.locator('.row-more').tap();
-  const sheet = page.locator('#row-actions-dialog');
-  await expect(sheet).toBeVisible();
-  // Inbox rows swipe to Today (right) and Drop (left); both are buttons here.
-  await expect(sheet.getByRole('button', { name: /Add to today/ })).toBeVisible();
-  await expect(sheet.getByRole('button', { name: /^Drop:/ })).toBeVisible();
-  await expect(sheet.getByRole('button', { name: /Park in Someday/ })).toBeVisible();
+  // Inbox rows swipe to Today (right) and Drop (left); both are visible
+  // buttons on the row, as is the non-swipe Someday action.
+  await expect(row.getByRole('button', { name: /Add to today/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: /^Drop:/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: /Park in Someday/ })).toBeVisible();
 });

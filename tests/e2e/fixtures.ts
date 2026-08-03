@@ -24,11 +24,10 @@ export async function capture(page: import('@playwright/test').Page, text: strin
 }
 
 /**
- * Invoke a row action by its accessible name, whichever surface is showing.
+ * Invoke a row action by its accessible name.
  *
- * Desktop renders the inline button row; touch hides it and puts the same
- * actions behind a per-row `⋯` sheet. Both use the identical accessible name
- * (they're built from one descriptor list), so tests can be written once.
+ * Every action is an inline button on the row (desktop reveals the full set
+ * on hover; touch shows the primary ones always) — there is no overflow menu.
  */
 export async function rowAction(
   page: import('@playwright/test').Page,
@@ -37,16 +36,7 @@ export async function rowAction(
   actionName: string
 ) {
   const row = page.locator(`#${listId} .task`, { hasText: taskText });
-  const inline = row.getByRole('button', { name: actionName });
-  if (await inline.isVisible()) {
-    await inline.click();
-    return;
-  }
-  await row.locator('.row-more').click();
-  const sheet = page.locator('#row-actions-dialog');
-  await expect(sheet).toBeVisible();
-  await sheet.getByRole('button', { name: actionName }).click();
-  await expect(sheet).toBeHidden();
+  await row.getByRole('button', { name: actionName }).click();
 }
 
 /** Read the persisted state straight from localStorage. */

@@ -704,11 +704,10 @@ body.hints-off .hint {
   font-size: 12px;
 }
 
-/* Touch shows each list's primary actions as visible buttons (swipe never
-   announced itself); everything else sits behind the overflow button. The
-   full inline row is still a desktop affordance — all of it at once plus the
-   text does not fit a 390pt screen, and in Focus mode the text renders at
-   2em. */
+/* Touch shows each list's primary actions as visible buttons — swipe never
+   announced itself, and there is no overflow menu. Non-primary actions are
+   desktop-hover-only because their job is covered elsewhere on touch (Done
+   by the checkbox, reordering hidden on done rows as noise). */
 .task .actions {
   display: flex;
   gap: 1px;
@@ -717,58 +716,6 @@ body.hints-off .hint {
 
 .task .actions .icon-btn:not(.primary) {
   display: none;
-}
-
-.row-more {
-  flex: none;
-  font-size: 17px;
-  line-height: 1;
-  color: var(--faint);
-}
-
-/* Action list inside the per-row sheet. */
-.sheet-action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-bottom: 8px;
-}
-
-.sheet-action {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 52px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--foreground);
-  font-family: inherit;
-  font-size: 15px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sheet-action:active {
-  background: var(--accent-bg);
-}
-
-.sheet-action.danger {
-  color: var(--danger);
-}
-
-.sheet-action:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-#row-actions-title {
-  font-size: 15px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .icon-btn {
@@ -1508,8 +1455,7 @@ body:has(dialog[open]) {
     border-color: var(--ring);
   }
 
-  /* With a mouse there's room for the inline row, and hover to reveal it —
-     so the overflow button isn't needed. */
+  /* With a mouse there's room for the full inline row, and hover reveals it. */
   .task .actions {
     opacity: 0;
   }
@@ -1521,10 +1467,6 @@ body:has(dialog[open]) {
   .task:hover .actions,
   .task:focus-within .actions {
     opacity: 1;
-  }
-
-  .row-more {
-    display: none;
   }
 
   .plain .swipe-fg:hover {

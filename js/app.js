@@ -193,11 +193,10 @@ function editableText(task) {
 
 // ---- row actions ------------------------------------------------------------
 
-// One description of what can be done to a task, consumed by three surfaces:
-// the inline button row (desktop), the per-row overflow sheet (touch), and the
-// swipe gestures. Kept in one place so they can't drift apart — and so "every
-// swipe also exists as a button" is true by construction rather than by
-// discipline.
+// One description of what can be done to a task, consumed by two surfaces:
+// the inline button row and the swipe gestures. Kept in one place so they
+// can't drift apart — and so "every swipe also exists as a button" is true by
+// construction rather than by discipline.
 
 /**
  * @typedef {object} RowAction
@@ -210,8 +209,10 @@ function editableText(task) {
  * @property {boolean} [disabled]
  * @property {'left' | 'right'} [swipe]
  * @property {string} [swipeLabel]     wording on the revealed swipe background
- * @property {boolean} [primary]       visible on the row even on touch — the
- *                                     rest stay behind the overflow button
+ * @property {boolean} [primary]       visible on the row even on touch; the
+ *                                     rest are desktop-hover-only (their job
+ *                                     is done elsewhere on touch, e.g. the
+ *                                     checkbox for Done)
  */
 
 /**
@@ -243,12 +244,14 @@ function rowActions(task, kind, ctx) {
         label: '↑',
         title: `Move up: ${task.text}`,
         disabled: idx === 0,
+        primary: task.status !== 'done',
         run: () => M.moveInToday(state, task.id, -1),
       },
       {
         label: '↓',
         title: `Move down: ${task.text}`,
         disabled: idx === count - 1,
+        primary: task.status !== 'done',
         run: () => M.moveInToday(state, task.id, 1),
       },
     ];
@@ -291,6 +294,7 @@ function rowActions(task, kind, ctx) {
       {
         label: 'Someday',
         title: `Park in Someday: ${task.text}`,
+        primary: true,
         undoneMessage: 'Parked in Someday',
         run: () => M.sendToSomeday(state, task.id),
         undo: () => M.demoteToInbox(state, task.id),
@@ -356,7 +360,7 @@ async function runAction(action) {
  * @param {'today' | 'inbox' | 'someday' | 'recycle'} kind
  * @param {{idx?: number, count?: number, room?: boolean, today?: string}} [ctx]
  * @returns {{row: HTMLLIElement, fg: HTMLElement, body: HTMLElement,
- *            actions: RowAction[], actionsEl: HTMLElement, overflow: HTMLElement}}
+ *            actions: RowAction[], actionsEl: HTMLElement}}
  */
 function taskRow(task, kind, ctx = {}) {
   const actions = rowActions(task, kind, ctx);
@@ -379,9 +383,11 @@ function taskRow(task, kind, ctx = {}) {
   const body = el('div', 'body');
   row.appendChild(fg);
 
-  // Inline buttons: all of them on desktop; on touch only the primary ones —
-  // swiping never announced itself, so the key action per list is a visible
-  // button everywhere.
+  // Inline buttons: all of them on desktop; on touch the primary ones —
+  // swiping never announced itself, so every action anyone needs is a
+  // visible button. (No overflow menu: on touch the only non-primary actions
+  // are covered elsewhere — Done by the checkbox — or hidden as noise, like
+  // reordering a done row.)
   const actionsEl = el('div', 'actions');
   for (const a of actions) {
     const btn = actionBtn(a.label, a.title, () => runAction(a), {
@@ -392,31 +398,7 @@ function taskRow(task, kind, ctx = {}) {
     actionsEl.appendChild(btn);
   }
 
-  // The rest (reorder, Someday) stay behind the overflow button; rows whose
-  // actions are all primary don't need one.
-  const overflow = actionBtn('⋯', `Actions for: ${task.text}`, () => openRowActions(task, actions));
-  overflow.classList.add('row-more');
-  overflow.hidden = actions.every((a) => a.primary);
-
-  return { row, fg, body, actions, actionsEl, overflow };
-}
-
-/** @param {Task} task @param {RowAction[]} actions */
-function openRowActions(task, actions) {
-  $('row-actions-title').textContent = task.text;
-  const listEl = $('row-actions-list');
-  listEl.replaceChildren();
-  for (const a of actions) {
-    const btn = el('button', 'sheet-action' + (a.danger ? ' danger' : ''), a.title);
-    btn.type = 'button';
-    btn.disabled = !!a.disabled;
-    btn.addEventListener('click', async () => {
-      $dialog('row-actions-dialog').close();
-      await runAction(a);
-    });
-    listEl.appendChild(btn);
-  }
-  $dialog('row-actions-dialog').showModal();
+  return { row, fg, body, actions, actionsEl };
 }
 
 /** @param {string} dateStr @param {string} today */
@@ -515,7 +497,7 @@ function renderToday(today) {
       listEl.appendChild(el('li', 'bonus-divider', 'bonus'));
     }
 
-    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'today', {
+    const { row, fg, body, actionsEl } = taskRow(task, 'today', {
       idx,
       count: list.length,
       today,
@@ -560,7 +542,7 @@ function renderToday(today) {
       body.appendChild(prompt);
     }
 
-    fg.append(checkWrap, body, actionsEl, overflow);
+    fg.append(checkWrap, body, actionsEl);
     listEl.appendChild(row);
   });
 }
@@ -574,11 +556,11 @@ function renderInbox() {
   const room = M.todayHasRoom(state);
 
   for (const task of tasks) {
-    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'inbox', { room });
+    const { row, fg, body, actionsEl } = taskRow(task, 'inbox', { room });
     body.appendChild(editableText(task));
     const marks = migrationMarks(task);
     if (marks) body.appendChild(marks);
-    fg.append(body, actionsEl, overflow);
+    fg.append(body, actionsEl);
     listEl.appendChild(row);
   }
 }
@@ -593,9 +575,9 @@ function renderSomeday() {
   $('someday-empty').hidden = tasks.length > 0;
 
   for (const task of tasks) {
-    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'someday', {});
+    const { row, fg, body, actionsEl } = taskRow(task, 'someday', {});
     body.appendChild(editableText(task));
-    fg.append(body, actionsEl, overflow);
+    fg.append(body, actionsEl);
     listEl.appendChild(row);
   }
 }
@@ -608,13 +590,13 @@ function renderRecycle() {
   $('recycle-section').hidden = tasks.length === 0;
 
   for (const task of tasks) {
-    const { row, fg, body, actionsEl, overflow } = taskRow(task, 'recycle', {});
+    const { row, fg, body, actionsEl } = taskRow(task, 'recycle', {});
     body.appendChild(el('span', 'text', task.text));
     const left = M.droppedDaysLeft(task);
     body.appendChild(
       el('span', 'expires', left === 0 ? 'expires today' : `expires in ${left} day${left === 1 ? '' : 's'}`)
     );
-    fg.append(body, actionsEl, overflow);
+    fg.append(body, actionsEl);
     listEl.appendChild(row);
   }
 }

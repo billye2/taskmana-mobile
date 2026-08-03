@@ -18,7 +18,7 @@ Mobile is the base layout; the desktop column is a `@media (min-width: 768px)` e
 
 On a phone there are four tabs — **Today · Inbox · Someday · More** — over a fixed dock holding the capture bar and the tab bar. The active tab lives in the URL hash, so Android Back and iOS edge-swipe return to the previous tab instead of leaving the app, and `#inbox` is a working deep link. Capture is always one tap away (except on More, which is settings), and files to the Inbox from anywhere — a toast says so and offers to promote to Today. Dialogs present as top sheets — dropped from the top edge, where the soft keyboard can never cover them.
 
-Each list's key actions are visible buttons right on the row — Inbox: **Today / ✕**, Today: **Inbox**, Someday: **Inbox / ✕**, Recycle: **Restore** — with anything else (reorder, Someday) behind the row's `⋯` sheet; rows whose actions all fit show no `⋯` at all. Rows also swipe as an accelerator: **right is constructive, left removes**, mirroring the buttons. Anything destructive raises an Undo toast, and a test asserts every swipe action exists as a button structurally.
+Every row action is a visible button on the row — no overflow menu. Inbox: **Today / Someday / ✕**, Today: **checkbox / ↑ / ↓ / Inbox**, Someday: **Inbox / ✕**, Recycle: **Restore**. Rows also swipe as an accelerator: **right is constructive, left removes**, mirroring the buttons. Anything destructive raises an Undo toast, and a test asserts every swipe action exists as a button structurally.
 
 At ≥768px the tab bar disappears, every section is on the page at once, sheets become centred modals, and each row shows its full button row on hover — close to the layout this had as a new-tab page.
 

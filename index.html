@@ -125,7 +125,7 @@
 
       <!-- Stamped by scripts/bump-version.mjs; answers "which release is this
            phone actually running" without DevTools. -->
-      <p class="more-note" id="version-line">Version 2.1.7</p>
+      <p class="more-note" id="version-line">Version 2.1.8</p>
     </section>
   </main>
 
@@ -246,20 +246,6 @@
         <button id="confirm-ok" class="btn" value="confirm"></button>
       </span>
     </footer>
-  </dialog>
-
-  <!-- Per-row actions on touch, where the inline button row would leave the
-       task text about 40% of the screen. Also the non-gestural path: every
-       swipe action appears here as a plain button. -->
-  <dialog id="row-actions-dialog" class="dialog sheet row-actions" aria-labelledby="row-actions-title">
-    <div class="sheet-grab" aria-hidden="true"></div>
-    <header class="sheet-head">
-      <h2 id="row-actions-title"></h2>
-      <button type="button" class="sheet-close" data-close aria-label="Close">✕</button>
-    </header>
-    <div class="sheet-body">
-      <div id="row-actions-list" class="sheet-action-list"></div>
-    </div>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden>
