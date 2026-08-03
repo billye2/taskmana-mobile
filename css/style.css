@@ -1469,18 +1469,21 @@ body:has(dialog[open]) {
     border-color: var(--ring);
   }
 
-  /* With a mouse there's room for the full inline row, and hover reveals it. */
+  /* Actions stay visible on desktop too — hover-reveal made rows look empty
+     and hid what the app can do. Same primary set as touch; the checkbox
+     already covers Done. The mobile squeeze (zero gap, overlapped tap boxes)
+     is undone here: these are small text buttons, not 44px boxes with dead
+     edges to hide. */
   .task .actions {
-    opacity: 0;
+    gap: 6px;
   }
 
-  .task .actions .icon-btn:not(.primary) {
-    display: inline-flex;
+  .task .actions .icon-btn {
+    padding: 3px 7px;
   }
 
-  .task:hover .actions,
-  .task:focus-within .actions {
-    opacity: 1;
+  .task .actions .icon-btn + .icon-btn {
+    margin-left: 0;
   }
 
   .plain .swipe-fg:hover {
@@ -1550,20 +1553,38 @@ body:has(dialog[open]) {
    centred reading column for a laptop. */
 
 @media (min-width: 768px) {
+  /* A monitor is a workspace, not a stretched phone: the three lists sit in
+     side-by-side columns (the promote/demote flow reads left-to-right), and
+     the settings live below. auto-fit collapses to two columns, then one, as
+     the window narrows. */
   .page {
-    max-width: 640px;
+    max-width: 1280px;
     margin: 0 auto;
     padding: 24px 24px calc(var(--dock-h) + 40px);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    align-items: start;
   }
 
-  /* No tabs on a laptop: every section is on the page at once, the way it was
-     before the shell existed. */
+  /* No tabs on a laptop: every section is on the page at once. */
   .view {
     display: block;
+    min-width: 0;
   }
 
-  .view + .view {
-    margin-top: 8px;
+  .view.section {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px 20px;
+  }
+
+  /* Settings read better narrow — centred under the columns. */
+  #more-section {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 680px;
+    justify-self: center;
   }
 
   .tabbar {
@@ -1571,9 +1592,9 @@ body:has(dialog[open]) {
   }
 
   .appbar {
-    max-width: 640px;
+    max-width: 1280px;
     margin: 0 auto;
-    padding: 8vh 24px 16px;
+    padding: 6vh 24px 20px;
     background: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
