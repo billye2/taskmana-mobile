@@ -2,9 +2,9 @@
 
 A calm personal task system as an installable web app — mobile-first, offline-capable, no build step. Live at **https://taskmana-nine.vercel.app**.
 
-It combines four pen-and-paper systems. **More → Method hints** toggles in-app explanations of each method with its author, each with cyclable (`↻`) real-world examples. Hints start on with a mouse and off on a phone, where they'd otherwise be half the first screen.
+It combines four pen-and-paper systems. **Settings → Method hints** toggles in-app explanations of each method with its author, each with cyclable (`↻`) real-world examples. Hints start on with a mouse and off on a phone, where they'd otherwise be half the first screen. (Settings live in the **More** tab on a phone and behind the masthead's **⚙** chip on desktop — every "More → …" path below means "⚙ → …" there.)
 
-- **Brain dump** (David Allen, *Getting Things Done*) — the capture bar, always within thumb reach at the bottom. Type, hit Enter, it's out of your head and into the Inbox.
+- **Brain dump** (David Allen, *Getting Things Done*) — the capture bar with its **Add** button, within thumb reach at the bottom on a phone and right under the masthead on desktop. Type, hit Add or Enter, it's out of your head and into the Inbox.
 - **Daily top-3 + ordered queue** (Ivy Lee Method, 1918) — Today holds up to 6 ordered tasks; the first 3 are visually "today's win." Toggle **Focus** to enforce Ivy Lee strictness: only the first unfinished task is actionable.
 - **Migration** (Ryder Carroll, Bullet Journal) — unfinished Today tasks carry over each day and earn a `›` mark. After 5 carries, the task asks you: *still worth doing?* Keep / Someday / Drop.
 - **Weekly review** (GTD) — the **Review** button walks through your inbox, someday list, and stale tasks one at a time (a red dot nudges you when it's been 7+ days). Finishing a review offers a one-click **Export backup** while the list is at its cleanest.
@@ -16,17 +16,19 @@ Theme: **More → Appearance** forces Light or Dark, or follows your system appe
 
 Mobile is the base layout; the desktop column is a `@media (min-width: 768px)` enhancement — the only width breakpoint in the stylesheet.
 
-On a phone there are four tabs — **Today · Inbox · Someday · More** — over a fixed dock holding the capture bar and the tab bar. The active tab lives in the URL hash, so Android Back and iOS edge-swipe return to the previous tab instead of leaving the app, and `#inbox` is a working deep link. Capture is always one tap away (except on More, which is settings), and files to the Inbox from anywhere — a toast says so and offers to promote to Today. Dialogs present as top sheets — dropped from the top edge, where the soft keyboard can never cover them.
+On a phone there are four tabs — **Today · Inbox · Someday · More** — over a fixed dock holding the capture bar and the tab bar. The active tab lives in the URL hash, so Android Back and iOS edge-swipe return to the previous tab instead of leaving the app, and `#inbox` is a working deep link. Capture is always one tap away (except on More, which is settings), and files to the Inbox from anywhere — a toast says so and offers to promote to Today. Dialogs present as floating popup cards pinned near the top of the screen, where the soft keyboard can never cover them.
 
 Every row action is a visible button on the row — no overflow menu. Inbox: **Today / Someday / ✕**, Today: **checkbox / ↑ / ↓ / Inbox**, Someday: **Inbox / ✕**, Recycle: **Restore**. Rows also swipe as an accelerator: **right is constructive, left removes**, mirroring the buttons. Anything destructive raises an Undo toast, and a test asserts every swipe action exists as a button structurally.
 
-At ≥768px the layout is the old extension's new-tab page, faithfully: date masthead with chips, the capture bar directly under it, then a single centred 640px column of sections with settings at the bottom. The tab bar disappears, dialogs become centred modals, and row actions stay visible — no hover-reveal. (The DOM stays mobile-first; flex `order` moves the capture dock up.)
+At ≥768px the layout is the old extension's new-tab page, faithfully: date masthead with chips, the capture bar directly under it, then a single centred 640px column of sections. Settings don't render at the page bottom there — the masthead's **⚙** chip opens the More section as a popover (outside click or Escape closes it). The tab bar disappears, dialogs become centred modals, and row actions stay visible — no hover-reveal. (The DOM stays mobile-first; flex `order` moves the capture dock up, and the More section node never moves.)
 
 ## Install
 
 Open the URL in Safari (iPhone) or Chrome (Android/desktop) → Share / menu → **Add to Home Screen**. That installs it as a standalone app with an offline app shell, and — unlike a plain browser tab, whose storage iOS evicts after ~7 days unused — durable storage.
 
-`manifest.webmanifest` + `sw.js` make it a PWA. The service worker precaches every script `index.html` loads; if you add one, add it to `ASSETS` in `sw.js` or an offline cold start will boot into a blank page. `scripts/bump-version.mjs` keeps the service-worker cache key in step with the release version, so each release invalidates the installed copy.
+`manifest.webmanifest` + `sw.js` make it a PWA. The service worker precaches every script `index.html` loads; if you add one, add it to `ASSETS` in `sw.js` or an offline cold start will boot into a blank page. `scripts/bump-version.mjs` keeps the service-worker cache key, `package.json`, and the visible **version line at the bottom of settings** in step, so each release invalidates the installed copy — and that version line is how you check what a device is actually running.
+
+Updates install themselves: the app checks for a new service worker every time it returns to the foreground (iOS restores it from memory without a navigation, so the browser's own check never fires) and reloads once the new version takes over.
 
 ## Deploying
 
@@ -40,7 +42,7 @@ This project is already wired to a Supabase project — `js/config.js` holds its
 
 1. Run `scripts/supabase-setup.sql` in the SQL editor. It's idempotent. The `taskmana_` table prefix matters: the Supabase project hosts several apps, and a bare `states` table would be a collision waiting to happen — `js/sync.js` reads `from('taskmana_states')`.
 2. Auth → Email templates → **Magic Link**: include `{{ .Token }}` in the body (e.g. "Your Taskmana code: {{ .Token }}"). `js/sync.js` uses `verifyOtp` with a 6-digit code, not a redirect link, so without the token in the template there is nothing to verify against.
-3. Put the project URL and anon key in `js/config.js`. The anon key is publishable and committed on purpose; RLS is the security boundary.
+3. Put the project URL and API key in `js/config.js`. The key is committed on purpose — it's the *publishable* kind (`sb_publishable_…`) and RLS is the security boundary. The shared project **disabled legacy JWT-style keys on 2026-06-03**: an old `eyJ…` anon key fails every request with "Legacy API keys are disabled", which surfaces in-app as a red sync error.
 
 Two things the single-app version of these instructions gets wrong for a **shared** Supabase project. `auth.users` is project-wide, so anyone signed up for another app in it can sign into Taskmana — RLS still scopes them to their own empty row, so it's a nuisance rather than a breach. And do **not** disable "Allow new users to sign up" as a lockdown: it's a project-wide setting that would break signup for the other apps. Use an email allowlist in the RLS policies instead.
 
@@ -68,20 +70,23 @@ Dev tooling (tests + types only):
 npm install
 npm run typecheck   # TypeScript strict mode over the JS source (checkJs + JSDoc)
 npm run test:unit   # node:test unit tests for model logic + sync merge (46 tests)
-npm run test:e2e    # Playwright over http + touch emulation: e2e, tab routing,
-                    # swipe gestures, sheets + keyboard insets, axe a11y,
-                    # 44px targets, visual regression (46 tests)
+npm run test:e2e    # Playwright over http: e2e, tab routing, swipe gestures,
+                    # dialog cards + keyboard insets, axe a11y, 44px targets,
+                    # visual regression (70 tests across two engine projects)
 npm test            # all of the above
 ```
 
-CI (GitHub Actions) runs typecheck + unit + e2e on every push to `main`. Releases follow a 0–9-per-segment scheme (`1.0.1 … 1.0.9 → 1.1.0`); `npm run bump` advances `package.json` and the `sw.js` cache key together. Stored state carries a schema `version`; `TaskmanaModel.migrateState` upgrades older shapes (and old backup files on import) stepwise — when changing the `State` shape, bump `STATE_VERSION` and add a migration entry.
+Playwright runs two projects: `chromium` (everything, desktop 900×900 plus per-spec device emulation) and `mobile-webkit`, which re-runs the mobile layout specs (`sheets`, `touch`) on real WebKit — the engine family of the actual phone, where a dialog-crushing flexbox bug once shipped invisibly because the suite was Blink-only.
 
-The e2e suite drives the app over http against real `localStorage`, so capture, persistence, day rollover, review, planning, theme, hints, and export/import are all exercised end-to-end. `nav.spec.ts` and `swipe.spec.ts` run under Pixel 7 emulation, since at desktop widths the tab bar is hidden and the inline buttons replace the overflow sheet.
+CI (GitHub Actions) runs typecheck + unit + e2e on every push to `main`. Releases follow a 0–9-per-segment scheme (`1.0.1 … 1.0.9 → 1.1.0`); `npm run bump` advances `package.json`, the `sw.js` cache key, and the settings version line in `index.html` together. Stored state carries a schema `version`; `TaskmanaModel.migrateState` upgrades older shapes (and old backup files on import) stepwise — when changing the `State` shape, bump `STATE_VERSION` and add a migration entry.
 
-Two testing notes worth keeping:
+The e2e suite drives the app over http against real `localStorage`, so capture, persistence, day rollover, review, planning, theme, hints, and export/import are all exercised end-to-end. `nav.spec.ts`, `swipe.spec.ts`, and `touch.spec.ts` run under Pixel 7 emulation; `sheets.spec.ts` under iPhone 14 — at desktop widths the tab bar is hidden.
 
-- `rowAction()` in `fixtures.ts` invokes a row action by accessible name on whichever surface is showing — inline button on desktop, `⋯` sheet on touch. Both are built from the same descriptor list in `rowActions()`, so they share names and a test can be written once.
-- Swipes are driven with `page.mouse`, which emits `pointerType: 'mouse'`. `js/swipe.js` therefore must never filter on pointer type — doing so would make gestures untestable without CDP.
+Three testing notes worth keeping:
+
+- Every row action is an inline button built from the one descriptor list in `rowActions()` (there is no overflow menu), so `rowAction()` in `fixtures.ts` can invoke any of them by accessible name on either layout. On desktop, controls inside settings need `openSettings()` first — the ⚙ popover closes on any outside click, so re-open it after page interactions.
+- Swipes are driven with `page.mouse`, which emits `pointerType: 'mouse'`. `js/swipe.js` therefore must never filter on pointer type — doing so would make gestures untestable without CDP. Drag helpers must also start over the task *text*: a row's centre can land on an inline action button, and swipe.js rightly ignores drags that start on a button.
+- Keyboard tests inject clean values into `applyInset()` — which is exactly why `measure()` itself gets hostile-input tests too (CDP page-scale zoom for phantom insets, `applyInset(2000)` for the clamp). Measuring with clean inputs once let a device-only bug ship twice.
 
 Accessibility tests run axe (WCAG 2.1 AA) on the page in both color schemes and on the dialogs, plus an explicit ≥44px sweep over every visible control on all four tabs (axe's own WCAG 2.2 `target-size` rule allows 24px, too lenient for a thumb). Visual regression baselines live in `tests/e2e/visual.spec.ts-snapshots/`; after an intentional UI change, refresh them with `npx playwright test --update-snapshots`.
 
@@ -96,5 +101,7 @@ Gotchas learned the hard way (preserved here so they aren't relearned):
 - `touch-action: pan-y` on a swipeable row (never `none`) keeps vertical scrolling on the compositor while leaving the horizontal axis to JS.
 - Dismissing the iOS keyboard with its own Done/✓ key hides it **without blurring the field**, so a blur-to-commit handler never runs and an inline editor looks stuck. `js/viewport.js` treats the keyboard closing as the end of editing.
 - Tearing a focused input out of the DOM fires `blur`. An editor whose Escape handler re-renders will therefore commit the edit it meant to discard — `editableText` latches commit/cancel so only the first one wins.
-- iOS Safari doesn't resize the layout viewport for the keyboard, and `env(keyboard-inset-height)` is Chromium-only — `visualViewport` (`resize` **and** `scroll`) is the only way to keep a fixed bottom bar above it. This applies to **bottom sheets too**, not just the dock: a bottom-anchored `<dialog>` stays pinned to the layout viewport and its form fields end up behind the keyboard. Scrolling `.sheet-body` can't rescue them — a short sheet has nothing to scroll — so the sheet itself translates up by `--kb-inset` and caps its height to what's left.
+- iOS Safari doesn't resize the layout viewport for the keyboard, and `env(keyboard-inset-height)` is Chromium-only — `visualViewport` (`resize` **and** `scroll`) is the only way to keep a fixed bottom bar above it. Dialogs sidestep the whole problem by anchoring near the **top** of the screen (the keyboard owns the bottom); their `max-height` still subtracts `--kb-inset` so a tall card can't run under it, with a `max()` floor so a bad inset degrades to "the body scrolls", never a crushed card.
+- `visualViewport` lies under zoom: iOS pinch/auto-zoom shrinks `vv.height` with no keyboard anywhere, and stale post-keyboard state persists. `measure()` returns 0 while `vv.scale > 1.05` and `applyInset()` clamps to 60% of the screen — without those guards, phantom "keyboards" crushed every dialog on-device while every emulator passed.
+- Never give the dialog body `flex: 1` — its 0% flex-basis lets older WebKit collapse an auto-height column flex container to header + footer with the body squeezed to one clipped line. `flex: 1 1 auto` is the immune form; a regression test asserts the rendered body always matches its content height. Current Chromium *and* current WebKit render `flex: 1` fine, which is how this shipped invisibly.
 - `cache.addAll()` in a service worker is all-or-nothing: one bad path aborts the install and the app is silently never offline-capable. `sw.js` uses `Promise.allSettled` over individual `cache.add()` calls.
