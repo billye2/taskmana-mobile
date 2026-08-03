@@ -1,7 +1,10 @@
 # Handoff — mobile-first port
 
-Status as of 2026-08-02 (evening, v2.2.2). Delete this file once the open items
-below are done; everything durable belongs in `README.md`, not here.
+Status as of 2026-08-02 (evening, v2.2.3). **Parked in a good state** — Billy:
+"this project is good for now." Sync verified working on his phone; dialogs,
+row buttons, capture, and both layouts confirmed on-device. The items below
+are the non-urgent remainder; start there next session. Delete this file once
+they're done; everything durable belongs in `README.md`, not here.
 
 Live: **https://taskmana-nine.vercel.app** (`taskmana.vercel.app` was taken).
 Repo: `billye2/taskmana-mobile` (private). Vercel project `taskmana`, connected
