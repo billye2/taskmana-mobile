@@ -54,7 +54,7 @@ State lives in `localStorage` under the key `taskmana-state`, and the app asks f
 
 The foot of **Today** shows what you finished today — the day's reward belongs on the day's screen. **More → Done** keeps a collapsed **Previous days** log: the last 14 days of finished tasks, grouped by day, like flipping back through a bullet journal. Completed tasks are never deleted; older days just aren't shown.
 
-Dropped tasks aren't gone immediately either: they sit in **More → Recycle bin** for 30 days (each row shows when it expires), where one tap restores them to the Inbox. After 30 days the daily rollover prunes them for good.
+Dropped tasks aren't gone immediately either: they sit in **More → Recycle bin** for 30 days (each row shows when it expires), where one tap restores them to the Inbox. After 30 days the daily rollover prunes them for good. The bin's 30-day notice is a `hint-pinned` element: it stays visible even with Method hints off, because a data-loss warning isn't teaching text.
 
 Use **More → Backup & sync → Export backup** (or the nudge after finishing a weekly review) to download a dated JSON backup (`taskmana-backup-YYYY-MM-DD.json`), and **Import** to restore one — it validates the file and asks before replacing your current tasks. In an installed app Export goes through the system share sheet, because an `<a download>` click is unreliable in a standalone iOS PWA.
 
@@ -64,12 +64,14 @@ No build step: the files in this folder are served as-is. The scripts are classi
 
 `npm run serve` starts a dependency-free static server on http://localhost:4173 (`scripts/serve.mjs`); Playwright starts the same one automatically.
 
+Icons: `icons/icon.svg` is the orange T tile, copied verbatim from the extension repo (`billye2/taskmana`) — keep the two in step. `npm run gen:icons` rasterizes it to all six PNG sizes (16–512) via `@resvg/resvg-js`; edit the SVG, regenerate, never touch the PNGs by hand.
+
 Dev tooling (tests + types only):
 
 ```sh
 npm install
 npm run typecheck   # TypeScript strict mode over the JS source (checkJs + JSDoc)
-npm run test:unit   # node:test unit tests for model logic + sync merge (46 tests)
+npm run test:unit   # node:test unit tests for model logic + sync merge (47 tests)
 npm run test:e2e    # Playwright over http: e2e, tab routing, swipe gestures,
                     # dialog cards + keyboard insets, axe a11y, 44px targets,
                     # visual regression (70 tests across two engine projects)
@@ -105,3 +107,5 @@ Gotchas learned the hard way (preserved here so they aren't relearned):
 - `visualViewport` lies under zoom: iOS pinch/auto-zoom shrinks `vv.height` with no keyboard anywhere, and stale post-keyboard state persists. `measure()` returns 0 while `vv.scale > 1.05` and `applyInset()` clamps to 60% of the screen — without those guards, phantom "keyboards" crushed every dialog on-device while every emulator passed.
 - Never give the dialog body `flex: 1` — its 0% flex-basis lets older WebKit collapse an auto-height column flex container to header + footer with the body squeezed to one clipped line. `flex: 1 1 auto` is the immune form; a regression test asserts the rendered body always matches its content height. Current Chromium *and* current WebKit render `flex: 1` fine, which is how this shipped invisibly.
 - `cache.addAll()` in a service worker is all-or-nothing: one bad path aborts the install and the app is silently never offline-capable. `sw.js` uses `Promise.allSettled` over individual `cache.add()` calls.
+- Row flex lives on `.swipe-fg`, the inner wrapper of swipeable rows. A row *outside* the swipe system (the plan dialog's `.plan-row`) has no wrapper and must declare its own `display: flex` — without it the row's children stack as normal flow, which shipped as a checkbox-above-its-text bug.
+- `rollover()`'s guard is `date <= lastRolloverDate`, not `===` (ported from the extension's v1.0.2 — `js/model.js` is meant to stay logic-identical with the extension's). Sync merges keep the **max** `lastRolloverDate`, so a phone whose local calendar is behind a synced-in date would otherwise re-run the rollover every sync cycle, inflating `migrationCount` and wiping `tomorrowQueue`.

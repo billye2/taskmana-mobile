@@ -1,10 +1,11 @@
 # Handoff — mobile-first port
 
-Status as of 2026-08-02 (evening, v2.2.3). **Parked in a good state** — Billy:
-"this project is good for now." Sync verified working on his phone; dialogs,
-row buttons, capture, and both layouts confirmed on-device. The items below
-are the non-urgent remainder; start there next session. Delete this file once
-they're done; everything durable belongs in `README.md`, not here.
+Status as of 2026-08-20 (v2.3.0). Active again after the 2026-08-02 park
+(v2.2.3, "this project is good for now"). Sync verified working on Billy's
+phone; dialogs, row buttons, capture, and both layouts confirmed on-device.
+The items below are the non-urgent remainder; start there next session.
+Delete this file once they're done; everything durable belongs in
+`README.md`, not here.
 
 Live: **https://taskmana-nine.vercel.app** (`taskmana.vercel.app` was taken).
 Repo: `billye2/taskmana-mobile` (private). Vercel project `taskmana`, connected
@@ -42,7 +43,17 @@ to that repo, so pushes to `main` deploy automatically.
   the existing `controllerchange` reload. A stamped version line at the bottom
   of settings says what a device is actually running — stale-cache ambiguity
   poisoned a whole debugging round before it existed.
-- Tests 24 → 46 unit + 70 e2e across two engine projects, all passing.
+- Tests 24 → 47 unit + 70 e2e across two engine projects, all passing.
+- **2026-08-19/20 session (v2.2.4 → v2.3.0):** security audit of tree + full
+  git history came back clean (no secret ever committed; the historical anon
+  JWT is inert — legacy keys confirmed disabled in the dashboard). Fixes:
+  plan-dialog rows got their own `display: flex` (no `.swipe-fg` wrapper
+  there; checkboxes had stacked above their text), rollover guard became
+  `<=` (port of the extension's v1.0.2 timezone-split fix, flagged by the
+  extension repo's session), the recycle bin's 30-day notice is pinned
+  visible with hints off, its summary row centres title + count, and the
+  icons are the extension's orange T tile — generated from `icons/icon.svg`
+  via `npm run gen:icons`, source shared verbatim with the extension.
 
 ## Open
 
@@ -63,8 +74,15 @@ to that repo, so pushes to `main` deploy automatically.
 4. **Maskable icon.** `manifest.webmanifest` deliberately declares only
    `purpose: "any"`. Pointing `purpose: "maskable"` at the current
    `icons/icon512.png` would make Android crop the logo — it has no safe-area
-   padding. Needs a new `icons/maskable512.png` with the logo inside the
-   central 80%, full-bleed background, before the entry is added.
+   padding. Now that the icons are generated from `icons/icon.svg`
+   (`npm run gen:icons`), this is a small variant SVG (T inside the central
+   80%, full-bleed background) plus one more line in the generator.
+
+5. **Re-add the home-screen icon on the iPhone.** iOS snapshots the
+   apple-touch-icon at install time, so the v2.2.9 orange T won't appear
+   until the app is removed from the home screen and re-added from Safari.
+   While at it, check the tile's transparent rounded corners — iOS fills
+   them black; if it looks bad, generate a full-bleed square 180px variant.
 
 ## Judgement calls worth revisiting
 
