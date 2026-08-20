@@ -162,6 +162,8 @@ test('method hints name their authors and can be toggled off', async ({ page }) 
   await expect(page.locator('#recycle-section .hint')).toContainText('30 days');
   await page.locator('#hints-toggle').click();
   await expect(hints.nth(0)).toBeHidden();
+  // the 30-day expiry notice is a data-loss warning, not teaching — pinned
+  await expect(page.locator('#recycle-section .hint')).not.toHaveCSS('display', 'none');
   await page.reload();
   await expect(page.locator('.hint').nth(0)).toBeHidden(); // persisted
 });

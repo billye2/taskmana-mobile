@@ -419,7 +419,9 @@ h2 {
   color: var(--foreground);
 }
 
-body.hints-off .hint {
+/* .hint-pinned survives the toggle: notices about data loss (the recycle
+   bin's 30-day expiry) are warnings, not method teaching. */
+body.hints-off .hint:not(.hint-pinned) {
   display: none;
 }
 
