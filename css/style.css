@@ -1295,7 +1295,10 @@ body:has(dialog[open]) {
 .plan-row {
   width: 100%;
   min-height: 52px;
+  /* No .swipe-fg wrapper here, so the row itself must lay out its children. */
+  display: flex;
   align-items: center;
+  gap: 10px;
   font: inherit;
   color: inherit;
   text-align: left;
