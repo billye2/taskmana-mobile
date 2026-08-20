@@ -1,6 +1,6 @@
 {
   "name": "taskmana",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "private": true,
   "description": "Personal mobile-first task web app (PWA). No build step — dev tooling is for tests and typechecking only.",
   "scripts": {
@@ -9,11 +9,13 @@
     "test:e2e": "playwright test",
     "test": "npm run typecheck && npm run test:unit && npm run test:e2e",
     "bump": "node scripts/bump-version.mjs",
+    "gen:icons": "node scripts/gen-icons.mjs",
     "serve": "node scripts/serve.mjs 4173"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.54.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@supabase/supabase-js": "^2.110.7",
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"
