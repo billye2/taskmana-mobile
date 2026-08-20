@@ -148,6 +148,21 @@ test('rollover increments migrationCount on unfinished today tasks', () => {
   assert.equal(t.migrationCount, 1);
 });
 
+test('rollover refuses to run backwards past a synced-in later date', () => {
+  // Sync merges keep the max lastRolloverDate, so a phone in an earlier
+  // timezone can hold a state already rolled to "tomorrow".
+  const s = freshState();
+  const t = add(s, 'lingering');
+  M.promoteToToday(s, t.id);
+  M.rollover(s, NEXT_DAY);
+  s.tomorrowQueue = [t.id];
+  assert.equal(M.rollover(s, DAY), false); // local date behind stored date
+  assert.equal(M.rollover(s, NEXT_DAY), false); // equal still idempotent
+  assert.equal(t.migrationCount, 1);
+  assert.deepEqual(s.tomorrowQueue, [t.id]);
+  assert.equal(s.lastRolloverDate, NEXT_DAY);
+});
+
 test('rollover promotes tomorrowQueue in order, ahead of carried tasks', () => {
   const s = freshState();
   const carried = add(s, 'carried');

@@ -550,7 +550,11 @@ function mergeStates(a, b, now = Date.now()) {
 // state changed.
 /** @param {State} state @param {string} date @returns {boolean} */
 function rollover(state, date) {
-  if (state.lastRolloverDate === date) return false;
+  // `<=`, not `===`: sync can merge in a lastRolloverDate from a device whose
+  // local calendar is already on tomorrow (mergeStates keeps the max). Rolling
+  // "backwards" here would inflate migrationCounts and wipe tomorrowQueue on
+  // every sync cycle until the timezones realign.
+  if (date <= state.lastRolloverDate) return false;
 
   for (const t of state.tasks) {
     if (t.status === 'done' && t.order !== null) {
