@@ -24,8 +24,8 @@ jobs:
       - name: Unit tests
         run: npm run test:unit
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers (chromium + webkit for mobile-webkit)
+        run: npx playwright install --with-deps chromium webkit
 
       # Screenshot baselines are macOS-rendered; CI runs every visual test's
       # flow but skips the pixel comparison (see ignoreSnapshots in config).
