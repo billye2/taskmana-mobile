@@ -471,6 +471,12 @@ body.hints-off .hint:not(.hint-pinned) {
   align-items: center;
 }
 
+/* The title's usual bottom margin would lift it off the row's centre line,
+   leaving the count looking sunken. */
+.recycle summary .more-title {
+  margin-bottom: 0;
+}
+
 .recycle summary::-webkit-details-marker {
   display: none;
 }
