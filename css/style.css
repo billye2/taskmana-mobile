@@ -743,6 +743,10 @@ body.hints-off .hint:not(.hint-pinned) {
   display: none;
 }
 
+.icon-btn svg {
+  display: block;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

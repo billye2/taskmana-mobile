@@ -1,6 +1,6 @@
 # Handoff — mobile-first port
 
-Status as of 2026-08-22 (v2.3.1). Latest: per-task "why" (schema v3),
+Status as of 2026-08-22 (v2.3.2). Latest: per-task "why" (schema v3),
 shipped in step with the extension; model.js is byte-identical again. Active again after the 2026-08-02 park
 (v2.2.3, "this project is good for now"). Sync verified working on Billy's
 phone; dialogs, row buttons, capture, and both layouts confirmed on-device.

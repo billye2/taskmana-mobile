@@ -119,6 +119,12 @@ function el(tag, className, text) {
   return node;
 }
 
+// Cube for "to inbox": the box things land in. Stroke follows currentColor.
+const CUBE_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>' +
+  '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
+
 /**
  * @param {string} label
  * @param {string} title
@@ -127,7 +133,10 @@ function el(tag, className, text) {
  * @returns {HTMLButtonElement}
  */
 function actionBtn(label, title, onClick, { danger = false, disabled = false } = {}) {
-  const b = el('button', 'icon-btn' + (danger ? ' danger' : ''), label);
+  const b = el('button', 'icon-btn' + (danger ? ' danger' : ''));
+  // Labels are plain text except the few inline SVG icons declared above.
+  if (label.startsWith('<svg')) b.innerHTML = label;
+  else b.textContent = label;
   b.title = title;
   // Visible text would win the accessible-name computation over title alone,
   // leaving e.g. every row's button announced as just "Today".
@@ -263,7 +272,7 @@ function fillTaskBody(task, body) {
  */
 function whyActionBtn(task, body) {
   if (task.why) return null;
-  const btn = actionBtn('Why', `Write why: ${task.text}`, () => startWhyEdit(task, body, null));
+  const btn = actionBtn('?', `Write why: ${task.text}`, () => startWhyEdit(task, body, null));
   btn.classList.add('primary');
   return btn;
 }
@@ -334,7 +343,7 @@ function rowActions(task, kind, ctx) {
     ];
     if (task.status !== 'done') {
       list.push({
-        label: 'Inbox',
+        label: CUBE_ICON,
         title: `Send back to inbox: ${task.text}`,
         primary: true,
         swipe: 'left',
@@ -386,7 +395,7 @@ function rowActions(task, kind, ctx) {
   if (kind === 'someday') {
     return [
       {
-        label: 'Inbox',
+        label: CUBE_ICON,
         title: `Move back to inbox: ${task.text}`,
         primary: true,
         swipe: 'right',
@@ -403,7 +412,7 @@ function rowActions(task, kind, ctx) {
   // prune is the daily rollover's job.
   return [
     {
-      label: 'Inbox',
+      label: CUBE_ICON,
       title: `Restore to inbox: ${task.text}`,
       primary: true,
       swipe: 'right',
