@@ -95,6 +95,32 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
   const prompt = page.locator('.migration-prompt');
   await expect(prompt).toContainText('Carried over 5×. Still worth doing?');
 
+  // writing a why is the Keep decision: the prompt goes, the why line stays
+  await prompt.getByRole('button', { name: 'Write why it matters and keep it' }).click();
+  const whyInput = page.locator('#today-list .why-input');
+  await whyInput.fill('  past me chose this topic ');
+  await whyInput.press('Enter');
+  await expect(page.locator('.migration-prompt')).toHaveCount(0);
+  const staleRow = page.locator('#today-list .task', { hasText: 'stale task' });
+  await expect(staleRow.locator('.why')).toHaveText('past me chose this topic');
+  await expect(staleRow.getByRole('button', { name: 'Write why: stale task' })).toHaveCount(0);
+
+  // edit in place; clearing removes the line and brings the Why action back
+  const touch = await page.evaluate(() => matchMedia('(hover: none)').matches);
+  if (touch) await staleRow.locator('.why').click();
+  else await staleRow.locator('.why').dblclick();
+  await page.locator('#today-list .why-input').fill('');
+  await page.locator('#today-list .why-input').press('Enter');
+  await expect(staleRow.locator('.why')).toHaveCount(0);
+  await staleRow.hover();
+  await expect(staleRow.getByRole('button', { name: 'Write why: stale task' })).toBeVisible();
+  // the prompt was acknowledged, so it stays gone
+  await expect(page.locator('.migration-prompt')).toHaveCount(0);
+  await writeStateAndReload(page, (s) => {
+    const stale = s.tasks.find((t: any) => t.text === 'stale task');
+    stale.ackMigrations = 0; // un-acknowledge so the review path below still sees a nudge
+  });
+
   // review nudge is due (never reviewed, candidates exist)
   await expect(page.locator('#review-badge')).toBeVisible();
 
@@ -103,8 +129,12 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
   await expect(page.locator('#review-text')).toHaveText('stale task');
   await expect(page.locator('#review-meta')).toContainText('carried over 5×');
   await expect(page.locator('#review-export')).toBeHidden(); // no nudge mid-review
+  // the why field is always on the card; a decision commits it
+  await expect(page.locator('#review-why-input')).toHaveValue('');
+  await page.locator('#review-why-input').fill('still want to try');
   await reviewActions.getByRole('button', { name: 'Someday' }).click();
   await expect(page.locator('#review-text')).toHaveText('inbox task');
+  await expect(page.locator('#review-why-input')).toHaveValue('');
   await reviewActions.getByRole('button', { name: 'This week' }).click();
   await expect(page.locator('#review-text')).toContainText('Review done');
 
@@ -119,6 +149,7 @@ test('5x migrated task shows honesty prompt; weekly review sorts and clears the 
 
   await expect(page.locator('#review-badge')).toBeHidden();
   await expect(page.locator('#someday-list .task .text')).toHaveText(['stale task']);
+  await expect(page.locator('#someday-list .task .why')).toHaveText(['still want to try']);
 });
 
 test('previous-days history is collapsed under the footer and expands on demand', async ({ page }) => {
@@ -200,6 +231,10 @@ test('review and plan dialogs have cyclable examples that follow the hints toggl
   await expect(reviewExample).toContainText('(1/4)');
   await page.getByRole('button', { name: 'Show another example for the weekly review' }).click();
   await expect(reviewExample).toContainText('(2/4)');
+  const whyExample = page.locator('.hint-example[data-section="why"] .example-text');
+  await expect(whyExample).toContainText('(1/4)');
+  await page.getByRole('button', { name: 'Show another example why' }).click();
+  await expect(whyExample).toContainText('whole argument');
   await page.locator('#review-close').click();
 
   // hints off hides dialog examples too

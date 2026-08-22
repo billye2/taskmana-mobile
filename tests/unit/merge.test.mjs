@@ -221,3 +221,11 @@ test('mergeStates is pure — neither input is mutated', () => {
   assert.equal(JSON.stringify(a), aBefore);
   assert.equal(JSON.stringify(b), bBefore);
 });
+
+test('merge keeps the newer copy’s why, including a cleared one', () => {
+  const a = st([mk('t', { why: 'written on laptop', modifiedAt: 5 })]);
+  const b = st([mk('t', { why: null, modifiedAt: 2 })]);
+  assert.equal(merge(a, b).tasks[0].why, 'written on laptop');
+  const cleared = st([mk('t', { why: null, modifiedAt: 9 })]);
+  assert.equal(merge(a, cleared).tasks[0].why, null);
+});

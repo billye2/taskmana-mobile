@@ -427,3 +427,37 @@ test('demoteToInbox renumbers the remaining today list contiguously', () => {
   M.demoteToInbox(s, b.id);
   assert.deepEqual(M.todayList(s).map((t) => [t.text, t.order]), [['a', 0], ['c', 1]]);
 });
+
+test('setWhy trims, clears on empty, and stamps modifiedAt only when it changes', () => {
+  const s = freshState();
+  const t = add(s, 'dissertation');
+  assert.equal(t.why, null);
+  const before = t.modifiedAt;
+  M.setWhy(s, t.id, '   '); // no why -> no why: not a change
+  assert.equal(t.why, null);
+  assert.equal(t.modifiedAt, before);
+  t.modifiedAt = 1;
+  M.setWhy(s, t.id, '  past me chose it  ');
+  assert.equal(t.why, 'past me chose it');
+  assert.ok(t.modifiedAt > 1);
+  t.modifiedAt = 1;
+  M.setWhy(s, t.id, 'past me chose it');
+  assert.equal(t.modifiedAt, 1); // same value, not touched
+  M.setWhy(s, t.id, '');
+  assert.equal(t.why, null);
+  assert.ok(t.modifiedAt > 1);
+  M.setWhy(s, 'missing', 'x'); // unknown id is a no-op
+});
+
+test('migration 2->3 backfills why and isValidState rejects a non-string why', () => {
+  const v2 = { ...freshState(), version: 2 };
+  const t = { ...add(v2, 'old'), why: undefined };
+  v2.tasks = [t];
+  const s = M.migrateState(v2);
+  assert.equal(s.version, M.STATE_VERSION);
+  assert.equal(s.tasks[0].why, null);
+  assert.equal(M.isValidState(s), true);
+  assert.equal(M.isValidState({ ...s, tasks: [{ ...s.tasks[0], why: 'a reason' }] }), true);
+  assert.equal(M.isValidState({ ...s, tasks: [{ ...s.tasks[0], why: { nope: 1 } }] }), false);
+  assert.equal(M.isValidState({ ...s, tasks: [{ ...s.tasks[0], why: 3 }] }), false);
+});

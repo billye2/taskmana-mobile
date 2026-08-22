@@ -16,6 +16,7 @@
  * @property {string | null} completedOn YYYY-MM-DD the task was completed.
  * @property {number} [droppedAt]
  * @property {number} modifiedAt Last mutation time; drives task-level sync merge.
+ * @property {string | null} [why] Why this task is on the list. Written when it stalls.
  *
  * @typedef {Object} Settings
  * @property {boolean} focusMode
@@ -48,7 +49,7 @@ function todayStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 
 /** @param {string} date @returns {State} */
 function initialState(date) {
@@ -87,7 +88,15 @@ const MIGRATIONS = {
     }
     return s;
   },
+  // 2 -> 3: per-task why, written at the carry-over prompt / weekly review.
+  2: (s) => {
+    for (const t of s.tasks) t.why ??= null;
+    return s;
+  },
 };
+
+/** @type {ThemeName[]} */
+const VALID_THEMES = ['system', 'light', 'dark'];
 
 // Upgrade a stored or imported state to the current schema. Returns null for
 // null input; unknown future versions are returned untouched.
@@ -104,6 +113,12 @@ function migrateState(state) {
     v += 1;
   }
   s.version = Math.max(v, STATE_VERSION);
+  // Defaults that must hold regardless of version — an imported or synced
+  // state may omit optional settings that the migrations above never revisit.
+  s.settings.focusMode = !!s.settings.focusMode;
+  if (s.settings.theme !== undefined && !VALID_THEMES.includes(s.settings.theme)) {
+    s.settings.theme = 'system';
+  }
   return s;
 }
 
@@ -294,6 +309,7 @@ function addTask(state, text) {
     completedAt: null,
     completedOn: null,
     modifiedAt: now,
+    why: null,
   };
   state.tasks.push(task);
   return task;
@@ -307,6 +323,19 @@ function editTask(state, id, text) {
     t.text = trimmed;
     touch(t);
   }
+}
+
+// The reason a task is still on the list. Whitespace clears it: an empty
+// why is stored as null, never as ''.
+/** @param {State} state @param {string} id @param {string} why */
+function setWhy(state, id, why) {
+  const t = getTask(state, id);
+  if (!t) return;
+  const trimmed = why.trim();
+  const next = trimmed || null;
+  if ((t.why ?? null) === next) return;
+  t.why = next;
+  touch(t);
 }
 
 /** @param {State} state @param {string} id @returns {boolean} */
@@ -430,29 +459,44 @@ function renumber(state) {
   });
 }
 
-// Shape check for imported backups — enough to guarantee the app can render
-// and mutate the state without crashing.
+// Shape check for imported backups and synced payloads — enough to guarantee
+// the app can render, mutate, and merge the state without crashing.
 /** @param {unknown} value @returns {value is State} */
 function isValidState(value) {
   if (typeof value !== 'object' || value === null) return false;
   const s = /** @type {Record<string, unknown>} */ (value);
   /** @type {string[]} */
   const statuses = ['inbox', 'today', 'someday', 'done', 'dropped'];
+  if (s.version !== undefined && typeof s.version !== 'number') return false;
+  if (s.lastReviewDate !== undefined && s.lastReviewDate !== null && typeof s.lastReviewDate !== 'string') {
+    return false;
+  }
+  if (!Array.isArray(s.tasks)) return false;
+  const ids = new Set();
+  for (const raw of s.tasks) {
+    const t = /** @type {Record<string, unknown>} */ (raw);
+    if (
+      !t ||
+      typeof t !== 'object' ||
+      typeof t.id !== 'string' ||
+      t.id === '' ||
+      ids.has(t.id) ||
+      typeof t.text !== 'string' ||
+      typeof t.status !== 'string' ||
+      !statuses.includes(t.status) ||
+      typeof t.createdAt !== 'number' ||
+      !(t.order === null || t.order === undefined || typeof t.order === 'number') ||
+      !(t.migrationCount === undefined || typeof t.migrationCount === 'number') ||
+      !(t.why === undefined || t.why === null || typeof t.why === 'string')
+    ) {
+      return false;
+    }
+    ids.add(t.id);
+  }
   return (
-    Array.isArray(s.tasks) &&
-    s.tasks.every((raw) => {
-      const t = /** @type {Record<string, unknown>} */ (raw);
-      return (
-        !!t &&
-        typeof t === 'object' &&
-        typeof t.id === 'string' &&
-        typeof t.text === 'string' &&
-        typeof t.status === 'string' &&
-        statuses.includes(t.status)
-      );
-    }) &&
     typeof s.lastRolloverDate === 'string' &&
     Array.isArray(s.tomorrowQueue) &&
+    s.tomorrowQueue.every((id) => typeof id === 'string') &&
     typeof s.settings === 'object' &&
     s.settings !== null
   );
@@ -460,6 +504,10 @@ function isValidState(value) {
 
 // ---- sync merge -------------------------------------------------------------
 
+// Whole-task last-write-wins: the copy with the newer modifiedAt replaces the
+// other entirely. Accepted trade-off — editing a task's text on one device
+// after completing it on another reverts the completion (no per-field stamps).
+// merge.test.mjs codifies this; revisit only if it bites in practice.
 /** @param {Task} x @param {Task} y @returns {Task} */
 function newerTask(x, y) {
   if ((x.modifiedAt ?? 0) !== (y.modifiedAt ?? 0)) {
@@ -550,10 +598,10 @@ function mergeStates(a, b, now = Date.now()) {
 // state changed.
 /** @param {State} state @param {string} date @returns {boolean} */
 function rollover(state, date) {
-  // `<=`, not `===`: sync can merge in a lastRolloverDate from a device whose
-  // local calendar is already on tomorrow (mergeStates keeps the max). Rolling
-  // "backwards" here would inflate migrationCounts and wipe tomorrowQueue on
-  // every sync cycle until the timezones realign.
+  // Only ever roll forward. A device whose local date is behind the state's
+  // (timezone skew between synced devices, or a tab left open past midnight
+  // merging a fresher state) must not re-run rollover with the older date —
+  // that would bump migration counts again and wipe the planned queue.
   if (date <= state.lastRolloverDate) return false;
 
   for (const t of state.tasks) {
@@ -600,7 +648,7 @@ return {
   todayList, inboxTasks, somedayTasks, droppedTasks, droppedDaysLeft,
   doneToday, doneHistory, todayHasRoom, tomorrowPreview,
   currentFocusTask, needsMigrationDecision, reviewCandidates, reviewDue, daysBetween,
-  addTask, editTask, promoteToToday, demoteToInbox, toggleDone,
+  addTask, editTask, setWhy, promoteToToday, demoteToInbox, toggleDone,
   moveInToday, sendToSomeday, dropTask, restoreDropped, keepMigrated,
   setTomorrowQueue, markReviewed, rollover, isValidState, mergeStates,
 };

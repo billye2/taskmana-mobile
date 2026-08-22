@@ -64,6 +64,12 @@ const EXAMPLES = {
     'Hesitating more than ten seconds on an item? That hesitation is the answer: Someday.',
     'The red dot isn’t nagging — it marks 7 days since this list was last honest.',
   ],
+  why: [
+    'Past me picked this topic with a clear head. Future me will be glad I tried, even if it never gets finished.',
+    'Every time I don’t feel like it and do it anyway, I feel better after. That’s the whole argument.',
+    'I’ve rehearsed this in my head a hundred times. Actually doing it costs less than rehearsing it again.',
+    'Five carry-overs and the why still reads true? Keep it. If it reads hollow, that’s your answer too.',
+  ],
   plan: [
     '9pm: queue “1. Finish the deck, 2. Call the bank…”. Overnight your brain stops rehearsing them; morning-you just executes.',
     'Ivy Lee’s rule for Bethlehem Steel executives: never more than six, work them strictly in order, unfinished ones move to tomorrow.',
@@ -142,6 +148,46 @@ function migrationMarks(task) {
 // No hover implies no double-click either (touch device) — edit on tap there.
 const coarsePointer = matchMedia('(hover: none)').matches;
 
+/**
+ * Wire an inline editor. Enter and blur commit, Escape discards.
+ *
+ * Enter commits, then the re-render tears the input out — which can fire
+ * blur and commit a second time. Escape has the same problem in reverse:
+ * its render() would blur into a commit and save the very edit it meant to
+ * discard. One latch settles both. A sync pull mid-edit re-renders too, and
+ * that blur commits the typing against the merged state instead of losing it.
+ * @param {HTMLInputElement} input
+ * @param {(value: string) => void} apply
+ */
+function wireInlineInput(input, apply) {
+  input.enterKeyHint = 'done';
+  let settled = false;
+  const commit = async () => {
+    if (settled) return;
+    settled = true;
+    apply(input.value);
+    await persistAndRender();
+  };
+  const cancel = () => {
+    if (settled) return;
+    settled = true;
+    render();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    }
+  });
+  input.addEventListener('blur', commit);
+  input.focus();
+  input.select();
+}
+
 /** @param {Task} task @returns {HTMLElement} */
 function editableText(task) {
   const span = el('span', 'text', task.text);
@@ -152,43 +198,74 @@ function editableText(task) {
     const input = el('input', 'edit-input');
     input.value = task.text;
     input.setAttribute('aria-label', 'Edit task');
-    input.enterKeyHint = 'done';
     span.replaceWith(input);
-    input.focus();
-    input.select();
-
-    // Enter commits, then the re-render tears the input out — which can fire
-    // blur and commit a second time. Escape has the same problem in reverse:
-    // its render() would blur into a commit and save the very edit it meant
-    // to discard. One latch settles both.
-    let settled = false;
-    const commit = async () => {
-      if (settled) return;
-      settled = true;
-      M.editTask(state, task.id, input.value);
-      await persistAndRender();
-    };
-    const cancel = () => {
-      if (settled) return;
-      settled = true;
-      render();
-    };
-
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        cancel();
-      }
-    });
-    input.addEventListener('blur', commit);
+    wireInlineInput(input, (v) => M.editTask(state, task.id, v));
   };
   span.addEventListener(coarsePointer ? 'click' : 'dblclick', startEdit);
   if (!coarsePointer) span.title = 'Double-click to edit';
   return span;
+}
+
+const WHY_PLACEHOLDER = 'Why is this on the list?';
+
+/**
+ * Open the why editor in a row. `replacing` is the element the input swaps in
+ * for (the existing why line, or the prompt's choices), or null to append a
+ * fresh input at the end of `body`.
+ * @param {Task} task
+ * @param {HTMLElement} body
+ * @param {HTMLElement | null} replacing
+ * @param {() => void} [alsoApply] extra mutation on a non-empty save
+ */
+function startWhyEdit(task, body, replacing, alsoApply) {
+  if (TaskmanaSwipe.isSwallowing()) return;
+  const input = el('input', 'edit-input why-input');
+  input.value = task.why ?? '';
+  input.placeholder = WHY_PLACEHOLDER;
+  input.setAttribute('aria-label', `Why: ${task.text}`);
+  if (replacing) replacing.replaceWith(input);
+  else body.appendChild(input);
+  wireInlineInput(input, (v) => {
+    M.setWhy(state, task.id, v);
+    if (v.trim()) alsoApply?.();
+  });
+}
+
+/**
+ * The why line under a task, editable in place. Returns null when the task
+ * has no why yet; the row offers a "Why" action in that case.
+ * @param {Task} task @param {HTMLElement} body @returns {HTMLElement | null}
+ */
+function whyLine(task, body) {
+  if (!task.why) return null;
+  const span = el('span', 'why', task.why);
+  span.addEventListener(coarsePointer ? 'click' : 'dblclick', () => startWhyEdit(task, body, span));
+  if (!coarsePointer) span.title = 'Double-click to edit';
+  return span;
+}
+
+/**
+ * Text + carry marks + why, appended to a row body.
+ * @param {Task} task @param {HTMLElement} body
+ */
+function fillTaskBody(task, body) {
+  body.appendChild(editableText(task));
+  const marks = migrationMarks(task);
+  if (marks) body.appendChild(marks);
+  const why = whyLine(task, body);
+  if (why) body.appendChild(why);
+}
+
+/**
+ * "Why" row action for a task without one; goes first in the button row so
+ * it is visible on touch too. Null when the task already has a why.
+ * @param {Task} task @param {HTMLElement} body @returns {HTMLButtonElement | null}
+ */
+function whyActionBtn(task, body) {
+  if (task.why) return null;
+  const btn = actionBtn('Why', `Write why: ${task.text}`, () => startWhyEdit(task, body, null));
+  btn.classList.add('primary');
+  return btn;
 }
 
 // ---- row actions ------------------------------------------------------------
@@ -523,29 +600,48 @@ function renderToday(today) {
     const checkWrap = el('label', 'check-wrap');
     checkWrap.appendChild(check);
 
-    body.appendChild(editableText(task));
-    const marks = migrationMarks(task);
-    if (marks) body.appendChild(marks);
+    fillTaskBody(task, body);
 
-    if (M.needsMigrationDecision(task)) {
-      const prompt = el('div', 'migration-prompt');
-      prompt.appendChild(el('span', 'q', `Carried over ${task.migrationCount}×. Still worth doing?`));
-      prompt.appendChild(actionBtn('Keep', 'Keep it on the list', async () => {
+    const askingWhy = M.needsMigrationDecision(task);
+    /** @type {HTMLElement | null} */
+    let prompt = null;
+    if (askingWhy) {
+      const box = el('div', 'migration-prompt');
+      prompt = box;
+      box.appendChild(el('span', 'q', `Carried over ${task.migrationCount}×. Still worth doing?`));
+      const choices = el('span', 'choices');
+      if (!task.why) {
+        // Writing the why is the keep decision. A reason that survives the
+        // stall is the honest version of "Keep".
+        choices.appendChild(actionBtn('Why?', 'Write why it matters and keep it', () => {
+          // The input takes the choices' place inside the amber box: the
+          // prompt spans the row, so the sentence gets the full width.
+          startWhyEdit(task, box, choices, () => M.keepMigrated(state, task.id));
+        }));
+      }
+      choices.appendChild(actionBtn('Keep', 'Keep it on the list', async () => {
         M.keepMigrated(state, task.id);
         await persistAndRender();
       }));
-      prompt.appendChild(actionBtn('Someday', 'Park it in Someday', async () => {
+      choices.appendChild(actionBtn('Someday', 'Park it in Someday', async () => {
         M.sendToSomeday(state, task.id);
         await persistAndRender();
       }));
-      prompt.appendChild(actionBtn('Drop', 'Drop this task', async () => {
+      choices.appendChild(actionBtn('Drop', 'Drop this task', async () => {
         M.dropTask(state, task.id);
         await persistAndRender();
       }, { danger: true }));
-      body.appendChild(prompt);
+      box.appendChild(choices);
     }
 
+    // The prompt already offers Why; done rows have nothing left to justify.
+    const why = whyActionBtn(task, body);
+    if (why && task.status !== 'done' && !askingWhy) actionsEl.prepend(why);
+
     fg.append(checkWrap, body, actionsEl);
+    // Below the row, full width: four choices at tap size don't fit in the
+    // text column next to the action buttons on a phone.
+    if (prompt) fg.appendChild(prompt);
     listEl.appendChild(row);
   });
 }
@@ -560,9 +656,9 @@ function renderInbox() {
 
   for (const task of tasks) {
     const { row, fg, body, actionsEl } = taskRow(task, 'inbox', { room });
-    body.appendChild(editableText(task));
-    const marks = migrationMarks(task);
-    if (marks) body.appendChild(marks);
+    fillTaskBody(task, body);
+    const why = whyActionBtn(task, body);
+    if (why) actionsEl.prepend(why);
     fg.append(body, actionsEl);
     listEl.appendChild(row);
   }
@@ -579,7 +675,9 @@ function renderSomeday() {
 
   for (const task of tasks) {
     const { row, fg, body, actionsEl } = taskRow(task, 'someday', {});
-    body.appendChild(editableText(task));
+    fillTaskBody(task, body);
+    const why = whyActionBtn(task, body);
+    if (why) actionsEl.prepend(why);
     fg.append(body, actionsEl);
     listEl.appendChild(row);
   }
@@ -836,6 +934,7 @@ function renderReviewCard() {
     $('review-meta').textContent =
       total === 0 ? '' : 'Fresh list — a good moment to back it up.';
     $('review-progress').textContent = '';
+    $input('review-why-input').value = '';
     actions.hidden = true;
     $('review-done-actions').hidden = total === 0;
     return;
@@ -851,6 +950,7 @@ function renderReviewCard() {
   const ageDays = Math.floor((Date.now() - task.createdAt) / 86400000);
   bits.push(ageDays === 0 ? 'added today' : `added ${ageDays} day${ageDays === 1 ? '' : 's'} ago`);
   $('review-meta').textContent = bits.join(' · ');
+  $input('review-why-input').value = task.why ?? '';
   $('review-progress').textContent = `${reviewIndex + 1} of ${total}`;
   const todayBtn = /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="today"]'));
   todayBtn.disabled = !M.todayHasRoom(state) || task.status === 'today';
@@ -861,6 +961,7 @@ $('review-actions').addEventListener('click', async (e) => {
   if (!act) return;
   const task = reviewQueue[reviewIndex];
   if (!task) return;
+  M.setWhy(state, task.id, $input('review-why-input').value);
   if (act === 'today') M.promoteToToday(state, task.id);
   if (act === 'keep' && task.status === 'someday') M.demoteToInbox(state, task.id);
   if (act === 'keep' && task.status === 'today') M.keepMigrated(state, task.id);
@@ -872,6 +973,22 @@ $('review-actions').addEventListener('click', async (e) => {
   render();
   renderReviewCard();
 });
+
+// The why field is always on the card. The review is where you're meant to
+// be honest, so it shouldn't cost a click. Enter and blur save without advancing.
+async function commitReviewWhy() {
+  const task = reviewQueue[reviewIndex];
+  if (!task) return;
+  const value = $input('review-why-input').value;
+  if (value.trim() === (task.why ?? '')) return;
+  M.setWhy(state, task.id, value);
+  await store.save(state);
+  render();
+}
+$('review-why-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') commitReviewWhy();
+});
+$('review-why-input').addEventListener('blur', commitReviewWhy);
 
 $('review-close').addEventListener('click', async () => {
   if (reviewQueue.length > 0 && reviewIndex >= reviewQueue.length) {
