@@ -1,6 +1,6 @@
 # Handoff — mobile-first port
 
-Status as of 2026-08-22 (v2.3.2). Latest: per-task "why" (schema v3),
+Status as of 2026-08-22 (v2.3.3). Latest: per-task "why" (schema v3),
 shipped in step with the extension; model.js is byte-identical again. Active again after the 2026-08-02 park
 (v2.2.3, "this project is good for now"). Sync verified working on Billy's
 phone; dialogs, row buttons, capture, and both layouts confirmed on-device.
@@ -96,7 +96,7 @@ to that repo, so pushes to `main` deploy automatically.
 - **The 768px branch means two layouts to maintain forever.** Worth it — Billy
   wants the extension look on a monitor and the app shell on a phone — but
   it's a standing cost, and the ⚙ popover added a little JS to that ledger.
-- **Today rows carry four visible controls** (checkbox, ↑, ↓, Inbox) inside
+- **Today rows carry three visible controls** (checkbox, ↑, Inbox) inside
   44px tap targets with deliberately overlapped dead edges. Fine at 390pt; if
   a smaller device ever matters, the squeeze in `css/style.css` is where to
   look.

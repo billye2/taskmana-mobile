@@ -47,7 +47,7 @@ test('touch: every action is a visible button on its row — no overflow menu', 
   await expect(row.getByRole('button', { name: /^Drop/ })).toBeVisible();
   await expect(page.locator('.row-more')).toHaveCount(0);
 
-  // Today rows: checkbox for done, then reorder arrows as visible buttons.
+  // Today rows: checkbox for done, then the move-up arrow as a visible button.
   await row.getByRole('button', { name: /Add to today/ }).tap();
   await page.locator('#capture-input').fill('second');
   await page.locator('#capture-input').press('Enter');
@@ -56,9 +56,8 @@ test('touch: every action is a visible button on its row — no overflow menu', 
   const todayRow = page.locator('#today-list .task', { hasText: 'second' });
   await expect(todayRow.getByRole('checkbox')).toBeVisible();
   await expect(todayRow.getByRole('button', { name: /Move up/ })).toBeVisible();
-  await expect(todayRow.getByRole('button', { name: /Move down/ })).toBeVisible();
 
-  // The arrows actually reorder.
+  // The arrow actually reorders.
   await todayRow.getByRole('button', { name: /Move up/ }).tap();
   await expect(page.locator('#today-list .task .text').first()).toHaveText('second');
 

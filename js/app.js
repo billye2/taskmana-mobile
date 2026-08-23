@@ -304,11 +304,11 @@ function whyActionBtn(task, body) {
 /**
  * @param {Task} task
  * @param {'today' | 'inbox' | 'someday' | 'recycle'} kind
- * @param {{idx?: number, count?: number, room?: boolean, today?: string}} ctx
+ * @param {{idx?: number, room?: boolean, today?: string}} ctx
  * @returns {RowAction[]}
  */
 function rowActions(task, kind, ctx) {
-  const { idx = 0, count = 0, room = false, today = M.todayStr() } = ctx;
+  const { idx = 0, room = false, today = M.todayStr() } = ctx;
 
   /** @type {RowAction} */
   const drop = {
@@ -332,13 +332,6 @@ function rowActions(task, kind, ctx) {
         disabled: idx === 0,
         primary: task.status !== 'done',
         run: () => M.moveInToday(state, task.id, -1),
-      },
-      {
-        label: '↓',
-        title: `Move down: ${task.text}`,
-        disabled: idx === count - 1,
-        primary: task.status !== 'done',
-        run: () => M.moveInToday(state, task.id, 1),
       },
     ];
     if (task.status !== 'done') {
@@ -447,7 +440,7 @@ async function runAction(action) {
  * Build a task row: swipe background, then the foreground that slides over it.
  * @param {Task} task
  * @param {'today' | 'inbox' | 'someday' | 'recycle'} kind
- * @param {{idx?: number, count?: number, room?: boolean, today?: string}} [ctx]
+ * @param {{idx?: number, room?: boolean, today?: string}} [ctx]
  * @returns {{row: HTMLLIElement, fg: HTMLElement, body: HTMLElement,
  *            actions: RowAction[], actionsEl: HTMLElement}}
  */
@@ -588,7 +581,6 @@ function renderToday(today) {
 
     const { row, fg, body, actionsEl } = taskRow(task, 'today', {
       idx,
-      count: list.length,
       today,
     });
     if (idx < M.TOP_COUNT) row.classList.add('top');
@@ -1213,7 +1205,6 @@ async function init() {
     const list = M.todayList(state);
     const action = rowActions(task, kind, {
       idx: list.indexOf(task),
-      count: list.length,
       room: M.todayHasRoom(state),
       today: M.todayStr(),
     }).find((a) => a.swipe === dir);
