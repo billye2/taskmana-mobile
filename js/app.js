@@ -48,7 +48,7 @@ const EXAMPLES = {
     'Finished only the top 3? That’s a won day. Everything under “bonus” is extra credit, not debt.',
   ],
   inbox: [
-    'Mid-focus and suddenly remember the plumber? Cmd+T, type “call plumber”, Enter, close the tab. Three seconds, and your head is quiet again.',
+    'Mid-focus and suddenly remember the plumber? Open Taskmana, type “call plumber”, Enter. Three seconds, and your head is quiet again.',
     'First time? Do a full brain dump tonight: keep typing until nothing else surfaces — 20+ items is normal, and the relief is immediate.',
     'Don’t sort while dumping. Capture messy now; the weekly Review is where you decide what each item becomes.',
     'Each morning, promote at most 3 items that would make today a win — and ignore the rest of this list guilt-free.',
