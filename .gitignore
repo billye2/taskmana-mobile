@@ -4,3 +4,4 @@ playwright-report/
 .vercel
 .env*
 .DS_Store
+HANDOFF.md

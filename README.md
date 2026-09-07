@@ -41,10 +41,11 @@ Signed out, the app is local-only. With a Supabase project configured, **More �
 This project is already wired to a Supabase project — `js/config.js` holds its URL and anon key, and the table exists. To set it up again from scratch:
 
 1. Run `scripts/supabase-setup.sql` in the SQL editor. It's idempotent. The `taskmana_` table prefix matters: the Supabase project hosts several apps, and a bare `states` table would be a collision waiting to happen — `js/sync.js` reads `from('taskmana_states')`.
-2. Auth → Email templates → **Magic Link**: include `{{ .Token }}` in the body (e.g. "Your Taskmana code: {{ .Token }}"). `js/sync.js` uses `verifyOtp` with a 6-digit code, not a redirect link, so without the token in the template there is nothing to verify against.
-3. Put the project URL and API key in `js/config.js`. The key is committed on purpose — it's the *publishable* kind (`sb_publishable_…`) and RLS is the security boundary. The shared project **disabled legacy JWT-style keys on 2026-06-03**: an old `eyJ…` anon key fails every request with "Legacy API keys are disabled", which surfaces in-app as a red sync error.
+2. Insert your sign-in email into `taskmana_allowed_emails` (the SQL file shows the statement). The RLS policies require it: a signed-in user whose email isn't listed can't create, read, or update a row, so nothing gets stored for them. The emails aren't in the repo — the repo is public — and the table has RLS on with no policies, so it can't be read through the API either.
+3. Auth → Email templates → **Magic Link**: include `{{ .Token }}` in the body (e.g. "Your Taskmana code: {{ .Token }}"). `js/sync.js` uses `verifyOtp` with a 6-digit code, not a redirect link, so without the token in the template there is nothing to verify against.
+4. Put the project URL and API key in `js/config.js`. The key is committed on purpose — it's the *publishable* kind (`sb_publishable_…`) and RLS is the security boundary. The shared project **disabled legacy JWT-style keys on 2026-06-03**: an old `eyJ…` anon key fails every request with "Legacy API keys are disabled", which surfaces in-app as a red sync error.
 
-Two things the single-app version of these instructions gets wrong for a **shared** Supabase project. `auth.users` is project-wide, so anyone signed up for another app in it can sign into Taskmana — RLS still scopes them to their own empty row, so it's a nuisance rather than a breach. And do **not** disable "Allow new users to sign up" as a lockdown: it's a project-wide setting that would break signup for the other apps. Use an email allowlist in the RLS policies instead.
+Two things the single-app version of these instructions gets wrong for a **shared** Supabase project. `auth.users` is project-wide, so anyone signed up for another app in it can sign into Taskmana — RLS still scopes them to their own empty row, so it's a nuisance rather than a breach. And do **not** disable "Allow new users to sign up" as a lockdown: it's a project-wide setting that would break signup for the other apps. The `taskmana_allowed_emails` table is that lockdown, scoped to this app only.
 
 Gotchas: Supabase free-tier projects pause after ~a week of inactivity (sync quietly stops; local keeps working; restore the project to resume). The vendored `js/vendor/supabase.js` is lazy-loaded only when a session exists or the Sync dialog opens, so a normal open doesn't pay its parse cost.
 
@@ -109,3 +110,7 @@ Gotchas learned the hard way (preserved here so they aren't relearned):
 - `cache.addAll()` in a service worker is all-or-nothing: one bad path aborts the install and the app is silently never offline-capable. `sw.js` uses `Promise.allSettled` over individual `cache.add()` calls.
 - Row flex lives on `.swipe-fg`, the inner wrapper of swipeable rows. A row *outside* the swipe system (the plan dialog's `.plan-row`) has no wrapper and must declare its own `display: flex` — without it the row's children stack as normal flow, which shipped as a checkbox-above-its-text bug.
 - `rollover()`'s guard is `date <= lastRolloverDate`, not `===` (ported from the extension's v1.0.2 — `js/model.js` is meant to stay logic-identical with the extension's). Sync merges keep the **max** `lastRolloverDate`, so a phone whose local calendar is behind a synced-in date would otherwise re-run the rollover every sync cycle, inflating `migrationCount` and wiping `tomorrowQueue`.
+
+## License
+
+MIT — see `LICENSE`.
